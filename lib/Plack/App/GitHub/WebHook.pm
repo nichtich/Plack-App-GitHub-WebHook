@@ -5,7 +5,8 @@ use v5.14.1;
 use JSON::PP qw(decode_json); # core module
 
 use parent 'Plack::Component';
-use Plack::Util::Accessor qw(hook access);
+use Plack::Util::Accessor qw(hook access app);
+use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
 
@@ -17,20 +18,20 @@ sub prepare_app {
     $self->access([
         allow => "204.232.175.64/27",
         allow => "192.30.252.0/22",
-        deny => 'all'
+        deny  => "all"
     ]) unless $self->access;
 
     $self->app(
         Plack::Middleware::Access->wrap(
             sub { $self->receive(shift) },
-            $self->access
+            @{ $self->access }
         )
     );
 }
 
 sub call {
     my ($self, $env) = @_;
-    $self->app($env);
+    $self->app->($env);
 }
 
 sub receive {

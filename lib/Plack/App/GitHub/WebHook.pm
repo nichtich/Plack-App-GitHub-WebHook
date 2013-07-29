@@ -24,7 +24,7 @@ sub prepare_app {
     $self->app(
         Plack::Middleware::Access->wrap(
             sub { $self->receive(shift) },
-            @{ $self->access }
+            rules => $self->access
         )
     );
 }
@@ -110,7 +110,8 @@ A code reference that gets passed the encoded payload.
 
 Access restrictions, as passed to L<Plack::Middleware::Access>. See SYNOPSIS
 for the default value. A recent list of official GitHub WebHook IPs is vailable
-at L<https://api.github.com/meta>.
+at L<https://api.github.com/meta>. One should only set the access value on
+instantiation, or manually call C<prepare_app> after modification.
 
 =back
 

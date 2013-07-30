@@ -1,4 +1,3 @@
-use v5.14.1;
 use Test::More;
 
 use HTTP::Message::PSGI;

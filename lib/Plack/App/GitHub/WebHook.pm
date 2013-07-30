@@ -1,6 +1,7 @@
 package Plack::App::GitHub::WebHook;
 #ABSTRACT: GitHub WebHook receiver as Plack application
 
+use v5.10;
 use JSON qw(decode_json);
 
 use parent 'Plack::Component';
@@ -13,7 +14,7 @@ sub prepare_app {
     my $self = shift;
 
     croak "hook must be a CODEREF" 
-        unless ref($self->hook) and ref($self->hook) eq 'CODE';
+        unless (ref($self->hook) // '') eq 'CODE';
 
     $self->access([
         allow => "204.232.175.64/27",
@@ -104,7 +105,7 @@ This L<PSGI> application receives HTTP POST requests with body parameter
 C<payload> set to a JSON object. The default use case is to receive
 L<GitHub WebHooks|https://help.github.com/articles/post-receive-hooks>.
 
-The application re
+The response of a HTTP request to this application is one of:
 
 =over 4
 
@@ -127,6 +128,8 @@ Otherwise. The hook is only called in this case. The hook should not die; a
 later version of this module may also catch errors.
 
 =back
+
+This module requires at least Perl 5.10.
 
 =head1 CONFIGURATION
 

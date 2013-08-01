@@ -56,16 +56,21 @@ sub call_granted {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
     }
 
-    $self->receive($json);
-
-    return [200,['Content-Type'=>'text/plain','Content-Length'=>2],['OK']];
+    if ( $self->receive($json) ) {
+        return [200,['Content-Type'=>'text/plain','Content-Length'=>2],['OK']];
+    } else {
+        return [202,['Content-Type'=>'text/plain','Content-Length'=>2],['Accepted']];
+    }
 }
 
 sub receive {
     my ($self, $payload) = @_;
 
-    # TODO: should this be catched?
-    $self->{hook}->($payload) if $self->{hook};
+    if ($self->{hook}) {
+        return $self->{hook}->($payload);
+    } else {
+        return;
+    }
 }
 
 =head1 SYNOPSIS
@@ -134,8 +139,11 @@ further validation.
 
 =item HTTP 200 OK
 
-Otherwise. The hook is only called in this case. The hook should not die; a
-later version of this module may also catch errors.
+Otherwise, if the hook was called and returned a true value.
+
+=item HTTP 202 Accepted
+
+Otherwise, if the hook was called and returned a false value.
 
 =back
 
@@ -147,7 +155,13 @@ This module requires at least Perl 5.10.
 
 =item hook
 
-A code reference that gets passed the encoded payload.
+A code reference that gets passed the encoded payload. Alternatively derive a
+subclass from Plack::App::GitHub::WebHook and implement the method C<receive>
+instead. The hook or receive method is expected to return a true value. If it
+returns a false value, the application will return HTTP status code 202 instead
+of 200. One can use this mechanism for instance to detect hooks that were
+called successfully but failed to execute for some reason.
+
 
 =item access
 

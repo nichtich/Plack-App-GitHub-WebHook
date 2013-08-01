@@ -27,6 +27,17 @@ test_psgi $app, sub {
     is_deeply $payload, {repository=>{name=>decode_utf8 '忍者'}}, 'payload';
 };
 
+$app = Plack::App::GitHub::WebHook->new(
+    hook   => sub { return 0; },
+    access => [ allow => '127.0.0.1' ]
+);
+
+test_psgi $app, sub {
+    my $cb = shift;
+    my $res = $cb->(POST '/', [ payload => '{"repository":{"name":"海賊"}}' ]);
+    is $res->code, 202, 'ok';
+};
+
 eval { Plack::App::GitHub::WebHook->new( hook => 1 )->prepare_app; };
 ok $@, "bad constructor";
 

@@ -6,7 +6,7 @@ use HTTP::Response;
 
 use Plack::App::GitHub::WebHook;
 
-my $app = Plack::App::GitHub::WebHook->new( hook => sub { } );
+my $app = Plack::App::GitHub::WebHook->new( hook => sub { 1 } );
 
 my $res = request( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
 is $res->code, 403, 'Forbidden';

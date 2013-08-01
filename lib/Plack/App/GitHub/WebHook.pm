@@ -1,6 +1,7 @@
 package Plack::App::GitHub::WebHook;
 #ABSTRACT: GitHub WebHook receiver as Plack application
 
+use strict;
 use v5.10;
 use JSON qw(decode_json);
 
@@ -13,8 +14,9 @@ use Carp qw(croak);
 sub prepare_app {
     my $self = shift;
 
-    croak "hook must be a CODEREF" 
-        unless (ref($self->hook) // '') eq 'CODE';
+    if ($self->hook and (!ref $self->hook or ref $self->hook ne 'CODE')) {
+        croak "hook must be a CODEREF"
+    }
 
     $self->access([
         allow => "204.232.175.64/27",
@@ -24,18 +26,22 @@ sub prepare_app {
 
     $self->app(
         Plack::Middleware::Access->wrap(
-            sub { $self->receive(shift) },
+            sub { $self->call_granted(shift) },
             rules => $self->access
         )
     );
+
+    $self->init;
 }
+
+sub init { }
 
 sub call {
     my ($self, $env) = @_;
     $self->app->($env);
 }
 
-sub receive {
+sub call_granted {
     my ($self, $env) = @_;
 
     if ( $env->{REQUEST_METHOD} ne 'POST' ) {
@@ -50,10 +56,16 @@ sub receive {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
     }
 
-    # should this be catched?
-    $self->{hook}->($json) if $self->{hook};
+    $self->receive($json);
 
     return [200,['Content-Type'=>'text/plain','Content-Length'=>2],['OK']];
+}
+
+sub receive {
+    my ($self, $payload) = @_;
+
+    # TODO: should this be catched?
+    $self->{hook}->($payload) if $self->{hook};
 }
 
 =head1 SYNOPSIS
@@ -82,10 +94,8 @@ sub receive {
         ]
     );
 
-
-    # alternatively
+    # this is equivalent to
     use Plack::Builder;
-
     builder {
         mount 'notify' => builder {
             enable 'Access', rules => [
@@ -111,7 +121,7 @@ The response of a HTTP request to this application is one of:
 
 =item HTTP 403 Forbidden
 
-If access was not granted.
+If access was not granted (for instance because it did not origin from GitHub).
 
 =item HTTP 405 Method Not Allowed
 
@@ -147,6 +157,11 @@ at L<https://api.github.com/meta>. One should only set the access value on
 instantiation, or manually call C<prepare_app> after modification.
 
 =back
+
+=head1 SEE ALSO
+
+L<WWW::GitHub::PostReceiveHook> uses L<Web::Simple> to receive GitHub web
+hooks. L<Net::GitHub> and L<Pithub> provide access to GitHub APIs.
 
 =encoding utf8
 

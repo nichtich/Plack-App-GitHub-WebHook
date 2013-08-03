@@ -2,7 +2,9 @@ package App::GitHub::Receiver;
 
 use strict;
 use parent 'Plack::App::GitHub::WebHook';
-use Plack::Util::Accessor qw(config);
+use Plack::Util::Accessor qw(config tasks);
+
+use App::GitHub::Receiver::Task;
 
 sub init {
     my $self = shift;
@@ -16,47 +18,58 @@ sub init {
         $self->config([ $self->config ]);
     }
 
-    # initialize actions
+    $self->tasks([]);
     foreach my $c (@{$self->config}) {
-        $c->{branch} = "*master" unless $c->{branch};
+        push @{ $self->tasks }, App::GitHub::Receiver::Task->new($c);
     }
-
 }
 
 sub receive {
     my ($self, $payload) = @_;
 
-    my $ref   = $payload->{ref};
-    my $after = $payload->{after};
+    # TODO: log_trace payload
 
-    foreach my $r ( @{ $self->config } ) {
-        next unless check_action( $r, $payload );
+    my $called = 0;
 
-        my $command = $r->{command};
-        if ((ref($command) // '') eq 'CODE') {
-            $command->($payload);
-        }
-    }
-#    $self->{config}->...
-}
-
-sub check_action {
-    my ($c, $p) = @_;
-     # TODO: check branch and url
-    my $branch = $c->{branch};
-
-    my $ref = $p->{ref} || '' ;
-    $ref =~ s{^refs/heads/}{};
-
-    unless( $branch eq '*' or $branch eq $ref or
-            ($branch eq '*master' and
-                $ref eq ($p->{repository}->{master_branch} || 'master')
-            )
-    ) {
-        return;
+    foreach my $task ( @{ $self->tasks } ) {
+        next unless $task->check( $payload );
+        $called = 1;
+        $task->execute( $payload );
     }
 
-    return 1;
+    return $called;
 }
 
 1;
+
+=head1 DESCRIPTION
+
+...
+
+=head1 LOGGING
+
+=over 4
+
+=item the web hook was called
+
+Log each call to the web hook, where it came from, what
+payload was passed, and how the call was responded to.
+
+Webserver log and C</var/log/github-receiver/access.log>?
+
+=item an action was executed
+
+The receiver executed an action in response to call to the web hook.
+
+C</var/log/github-receiver/.log>?
+
+
+=item stdout and stderr of an action
+
+One file per execution/job
+
+C</var/log/github-receiver/jobs/JOBID.log>
+
+=back
+
+=cut

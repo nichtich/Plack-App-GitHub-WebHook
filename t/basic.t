@@ -32,11 +32,13 @@ $app = Plack::App::GitHub::WebHook->new(
     access => [ allow => '127.0.0.1' ]
 );
 
-test_psgi $app, sub {
+my $emptyapp = Plack::App::GitHub::WebHook->new( access => [ allow => 'all' ] );
+
+test_psgi $_, sub {
     my $cb = shift;
     my $res = $cb->(POST '/', [ payload => '{"repository":{"name":"海賊"}}' ]);
-    is $res->code, 202, 'ok';
-};
+    is $res->code, 202, 'accepted (202)';
+} for ($app, $emptyapp);
 
 eval { Plack::App::GitHub::WebHook->new( hook => 1 )->prepare_app; };
 ok $@, "bad constructor";

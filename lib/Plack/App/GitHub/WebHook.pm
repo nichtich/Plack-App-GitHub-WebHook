@@ -85,7 +85,7 @@ sub receive {
                 ...
             }
         }
-    );
+    )->to_app;
 
 
     # access restriction, as enabled by default
@@ -96,7 +96,7 @@ sub receive {
             allow => "192.30.252.0/22",
             deny  => 'all'
         ]
-    );
+    )->to_app;
 
     # this is equivalent to
     use Plack::Builder;

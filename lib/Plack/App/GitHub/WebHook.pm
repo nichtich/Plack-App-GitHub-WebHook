@@ -80,12 +80,11 @@ sub receive {
     Plack::App::GitHub::WebHook->new(
         hook => sub {
             my $payload = shift;
-
             return unless $payload->{repository}->{name} eq 'foo-bar';
-
             foreach (@{$payload->{commits}}) {
                 ...
             }
+        }
     );
 
 

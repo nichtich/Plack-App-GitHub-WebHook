@@ -1,4 +1,8 @@
 # Change file for Plack::App::GitHub::WebHook
 
+0.3 2014-01-02
+    - Additional return code 202
+    - Minor documentation fixes (thanks to Tomáš Znamenáček)
+
 0.2 2013-07-30
-    First public version at CPAN
+    - First public version at CPAN

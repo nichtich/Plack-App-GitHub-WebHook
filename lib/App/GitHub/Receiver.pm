@@ -1,5 +1,6 @@
 package App::GitHub::Receiver;
-
+#ABSTRACT: ...
+#VERSION
 use strict;
 use parent 'Plack::App::GitHub::WebHook';
 use Plack::Util::Accessor qw(config tasks);

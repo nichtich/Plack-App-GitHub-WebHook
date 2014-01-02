@@ -1,5 +1,6 @@
 package App::GitHub::Receiver::Task;
-
+#ABSTRACT: ...
+#VERSION
 use strict;
 use Moo;
 

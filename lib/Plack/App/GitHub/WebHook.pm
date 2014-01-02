@@ -1,6 +1,6 @@
 package Plack::App::GitHub::WebHook;
 #ABSTRACT: GitHub WebHook receiver as Plack application
-
+#VERSION
 use strict;
 use v5.10;
 use JSON qw(decode_json);

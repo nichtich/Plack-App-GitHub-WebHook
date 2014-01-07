@@ -59,7 +59,7 @@ sub call_granted {
     if ( $self->receive($json) ) {
         return [200,['Content-Type'=>'text/plain','Content-Length'=>2],['OK']];
     } else {
-        return [202,['Content-Type'=>'text/plain','Content-Length'=>2],['Accepted']];
+        return [202,['Content-Type'=>'text/plain','Content-Length'=>8],['Accepted']];
     }
 }
 

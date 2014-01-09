@@ -30,6 +30,6 @@ is test_hook( $hook, '{"repository":{"name":"bar"}}' ), 202, 'hook accepted';
 is $ok, 1, 'hook not fully called';
   
 is test_hook( $hook, '{"repository":{"name":"foo"}}' ), 200, 'hook ok';
-is $ok, 1, 'hook fully called';
+is $ok, 2, 'hook fully called';
 
 done_testing;

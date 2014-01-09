@@ -177,12 +177,14 @@ This module requires at least Perl 5.10.
 
 =item hook
 
-A code reference or an array reference of code references with hooks. Each hook
-gets passed the encoded payload. If the hook returns a true value, next the
-hook is called or HTTP status code 200 is returned. Otherwise HTTP status code
-202 is returned immediately. This mechanism can be used for conditional hooks
-or to detect hooks that were called successfully but failed to execute for some
-reason.
+A code reference or an array reference of code references with multiple tasks.
+Each task gets passed the encoded payload. If the task returns a true value,
+next the task is called or HTTP status code 200 is returned. Information can be
+passed from one task to the next by modifying the payload. 
+
+If a task fails or no task was given, HTTP status code 202 is returned
+immediately. This mechanism can be used for conditional hooks or to detect
+hooks that were called successfully but failed to execute for some reason.
 
 =item access
 

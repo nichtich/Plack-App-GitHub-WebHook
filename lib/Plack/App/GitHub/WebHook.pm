@@ -14,8 +14,14 @@ use Carp qw(croak);
 sub prepare_app {
     my $self = shift;
 
-    if ($self->hook and (!ref $self->hook or ref $self->hook ne 'CODE')) {
-        croak "hook must be a CODEREF"
+    if ($self->hook) {
+        if ( (ref $self->hook // '') eq 'CODE' ) {
+            $self->hook( [ $self->hook ] );
+        } elsif ( (ref $self->hook // '') ne 'ARRAY' ) {
+            croak "hook must be a CODEREF or ARRAYREF";
+        }
+    } else {
+        $self->hook([]);
     }
 
     $self->access([
@@ -66,11 +72,12 @@ sub call_granted {
 sub receive {
     my ($self, $payload) = @_;
 
-    if ($self->{hook}) {
-        return $self->{hook}->($payload);
-    } else {
-        return;
-    }
+    my $ok;
+    foreach my $hook (@{$self->{hook}}) {
+        return unless $hook->($payload);
+        $ok++;
+    } 
+    return $ok;
 }
 
 =head1 SYNOPSIS
@@ -80,15 +87,30 @@ sub receive {
     Plack::App::GitHub::WebHook->new(
         hook => sub {
             my $payload = shift;
-            return unless $payload->{repository}->{name} eq 'foo-bar';
-            foreach (@{$payload->{commits}}) {
-                ...
-            }
+            ...
         }
     )->to_app;
 
+=head2 Multiple hooks
 
-    # access restriction, as enabled by default
+If multiple hooks are provided, they get called one by one until
+a hook returns a false value.
+
+    use Plack::App::GitHub::WebHook;
+    use IPC::Run3;
+
+    Plack::App::GitHub::WebHook->new(
+        hook => [
+            sub { $_[0]->{repository}{name} eq 'foo' }, # filter
+            sub { my ($payload) = @_; ...  }, # some action
+            sub { run3 \@cmd ... }, # some more action
+        ]
+    )->to_app;
+
+=head2 Access restriction    
+
+By default access is restricted to known GitHub WebHook IPs.
+
     Plack::App::GitHub::WebHook->new(
         hook => sub { ... },
         access => [
@@ -112,6 +134,7 @@ sub receive {
             );
         }
     };
+
 
 =head1 DESCRIPTION
 
@@ -154,13 +177,12 @@ This module requires at least Perl 5.10.
 
 =item hook
 
-A code reference that gets passed the encoded payload. Alternatively derive a
-subclass from Plack::App::GitHub::WebHook and implement the method C<receive>
-instead. The hook or receive method is expected to return a true value. If it
-returns a false value, the application will return HTTP status code 202 instead
-of 200. One can use this mechanism for instance to detect hooks that were
-called successfully but failed to execute for some reason.
-
+A code reference or an array reference of code references with hooks. Each hook
+gets passed the encoded payload. If the hook returns a true value, next the
+hook is called or HTTP status code 200 is returned. Otherwise HTTP status code
+202 is returned immediately. This mechanism can be used for conditional hooks
+or to detect hooks that were called successfully but failed to execute for some
+reason.
 
 =item access
 

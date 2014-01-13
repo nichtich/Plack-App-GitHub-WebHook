@@ -82,6 +82,8 @@ sub receive {
 
 =head1 SYNOPSIS
 
+=head2 Basic usage
+
     use Plack::App::GitHub::WebHook;
 
     Plack::App::GitHub::WebHook->new(
@@ -91,10 +93,10 @@ sub receive {
         }
     )->to_app;
 
-=head2 Multiple hooks
+=head2 Multiple task hooks
 
-If multiple hooks are provided, they get called one by one until
-a hook returns a false value.
+A hook can consist of multiple tasks, given by an array reference. The tasks
+are called one by one until a task returns a false value.
 
     use Plack::App::GitHub::WebHook;
     use IPC::Run3;
@@ -197,8 +199,31 @@ instantiation, or manually call C<prepare_app> after modification.
 
 =head1 SEE ALSO
 
+=over
+
+=item
+
 L<WWW::GitHub::PostReceiveHook> uses L<Web::Simple> to receive GitHub web
-hooks. L<Net::GitHub> and L<Pithub> provide access to GitHub APIs.
+hooks. A listener as exemplified by the module can also be created like this:
+
+    use Plack::App::GitHub::WebHook;
+    use Plack::Builder;
+    build {
+        mount '/myProject' => 
+            Plack::App::GitHub::WebHook->new(
+                hook => sub { my $payload = shift; }
+            );
+        mount '/myOtherProject' => 
+            Plack::App::GitHub::WebHook->new(
+                hook => sub { run3 \@cmd ... }
+            );
+    };
+
+=item
+
+L<Net::GitHub> and L<Pithub> provide access to GitHub APIs.
+
+=back
 
 =encoding utf8
 

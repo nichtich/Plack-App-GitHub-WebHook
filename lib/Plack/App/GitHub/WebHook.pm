@@ -10,18 +10,28 @@ use Plack::Util::Accessor qw(hook access app);
 use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
+use WebHook;
 
 sub prepare_app {
     my $self = shift;
 
-    if ($self->hook) {
-        if ( (ref $self->hook // '') eq 'CODE' ) {
-            $self->hook( [ $self->hook ] );
-        } elsif ( (ref $self->hook // '') ne 'ARRAY' ) {
-            croak "hook must be a CODEREF or ARRAYREF";
+    if ( (ref $self->hook // '') ne 'ARRAY' ) {
+        $self->hook( [ $self->hook // () ] );
+    }
+
+    for ( my $i=0; $i < scalar @{$self->hook}; $i++ ) {
+        my $task = $self->hook->[$i];
+        next if ref $task and ref $task eq 'CODE';
+
+        if ( (ref $task // '') ne 'HASH') {
+            croak "hook must be a ref to CODE, ARRAY, or HASH";
         }
-    } else {
-        $self->hook([]);
+        if ( scalar keys %$task != 1 ) {
+            croak "hook must be HASH ref with one key!"
+        }
+        my ($class, $config) = each %$task;
+        my $h = WebHook->new( $class, %$config );
+        $self->hook->[$i] = sub { $h->call(@_) };
     }
 
     $self->access([
@@ -32,7 +42,7 @@ sub prepare_app {
 
     $self->app(
         Plack::Middleware::Access->wrap(
-            sub { $self->call_granted(shift) },
+            sub { $self->call_granted($_[0]) },
             rules => $self->access
         )
     );
@@ -104,6 +114,7 @@ are called one by one until a task returns a false value.
     Plack::App::GitHub::WebHook->new(
         hook => [
             sub { $_[0]->{repository}{name} eq 'foo' }, # filter
+            { Filter => { repository_name => 'foo' } }, # equivalent filter
             sub { my ($payload) = @_; ...  }, # some action
             sub { run3 \@cmd ... }, # some more action
         ]
@@ -179,7 +190,9 @@ This module requires at least Perl 5.10.
 
 =item hook
 
-A code reference or an array reference of code references with multiple tasks.
+The hook can be any of a code reference, an array reference, or a hash
+reference.
+
 Each task gets passed the encoded payload. If the task returns a true value,
 next the task is called or HTTP status code 200 is returned. Information can be
 passed from one task to the next by modifying the payload. 
@@ -200,6 +213,10 @@ instantiation, or manually call C<prepare_app> after modification.
 =head1 SEE ALSO
 
 =over
+
+=item
+
+L<WebHook> and L<WebHook::Filter>
 
 =item
 

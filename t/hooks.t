@@ -23,7 +23,7 @@ is test_hook( sub { $ok = 1 }, '{}' ), 200;
 is $ok, 1, 'hook called';
 
 my $hook = [
-    sub { $_[0]->{repository}{name} eq 'foo' },
+    { Filter => { repository_name => 'foo' } },
     sub { $ok = 2; }
 ];
 is test_hook( $hook, '{"repository":{"name":"bar"}}' ), 202, 'hook accepted';

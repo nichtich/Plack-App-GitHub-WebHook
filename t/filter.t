@@ -7,6 +7,6 @@ ok $hook->call({ ref => 'master' });
 ok !$hook->call({ });
 
 $hook = WebHook->new('Filter', ref => 'xxx', foo_bar => [qw(2 3)]);
-ok !$hook->call({ foo => { bar => 2 } , ref => 'xxx'});
+ok $hook->call({ foo => { bar => 2 } , ref => 'xxx'});
 
 done_testing;

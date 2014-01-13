@@ -19,14 +19,14 @@ sub call {
         } elsif (ref $test eq 'Regexp') {
             $self->{$key} = sub { $_[0] =~ $test };
         } elsif (ref $test eq 'ARRAY') {
-            $self->{$key} = sub { scalar (grep { $_[0] eq $_ } @$test) };
+            $self->{$key} = sub { 
+                scalar (grep { $_[0] eq $_ } @$test) 
+            };
         }
-
-        my $value = $payload->{$key};
 
         # repository_url, repository_owner_name, ...
         my @parts = split /_/, $key;
-        shift @parts;
+        my $value = $payload->{ shift @parts };
         foreach (@parts) {
             $value = eval { $value->{$_} } or return;
         }

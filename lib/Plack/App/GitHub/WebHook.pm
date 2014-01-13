@@ -203,6 +203,11 @@ instantiation, or manually call C<prepare_app> after modification.
 
 =item
 
+GitHub WebHooks are documented at
+L<https://help.github.com/articles/post-receive-hooks>.
+
+=item
+
 L<WWW::GitHub::PostReceiveHook> uses L<Web::Simple> to receive GitHub web
 hooks. A listener as exemplified by the module can also be created like this:
 

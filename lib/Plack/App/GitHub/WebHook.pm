@@ -152,8 +152,9 @@ By default access is restricted to known GitHub WebHook IPs.
 =head1 DESCRIPTION
 
 This L<PSGI> application receives HTTP POST requests with body parameter
-C<payload> set to a JSON object. The default use case is to receive
-L<GitHub WebHooks|https://help.github.com/articles/post-receive-hooks>.
+C<payload> set to a JSON object. The default use case is to receive 
+L<GitHub WebHooks|http://developer.github.com/webhooks/>, for instance
+L<PushEvents|http://developer.github.com/v3/activity/events/types/#pushevent>.
 
 The response of a HTTP request to this application is one of:
 
@@ -220,8 +221,7 @@ L<WebHook> and L<WebHook::Filter>
 
 =item
 
-GitHub WebHooks are documented at
-L<https://help.github.com/articles/post-receive-hooks>.
+GitHub WebHooks are documented at L<http://developer.github.com/webhooks/>.
 
 =item
 

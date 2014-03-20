@@ -225,6 +225,20 @@ GitHub WebHooks are documented at L<http://developer.github.com/webhooks/>.
 
 =item
 
+GitHub does not include webhook event types in the payload but as HTTP request
+header C<X-GitHub-Event>. To only handle selected event types, use a
+conditional middleware:
+
+    build {
+        enable_if { ($_[0]->{HTTP_X_GITHUB_EVENT} // '') eq 'push' } 
+            Plack::App::GitHub::WebHook->new( hook => $push_hook );
+        enable_if { ($_[0]->{HTTP_X_GITHUB_EVENT} // '') eq 'issue' } 
+            Plack::App::GitHub::WebHook->new( hook => $issue_hook );
+        ...
+    };
+
+=item
+
 L<WWW::GitHub::PostReceiveHook> uses L<Web::Simple> to receive GitHub web
 hooks. A listener as exemplified by the module can also be created like this:
 

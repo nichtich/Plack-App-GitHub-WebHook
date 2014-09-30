@@ -8,7 +8,6 @@ use Plack::Util::Accessor qw(hook access app events);
 use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
-use WebHook;
 
 our $VERSION = '0.4';
 
@@ -19,19 +18,10 @@ sub prepare_app {
         $self->hook( [ $self->hook // () ] );
     }
 
-    for ( my $i=0; $i < scalar @{$self->hook}; $i++ ) {
-        my $task = $self->hook->[$i];
-        next if ref $task and ref $task eq 'CODE';
-
-        if ( (ref $task // '') ne 'HASH') {
-            croak "hook must be a ref to CODE, ARRAY, or HASH";
+    foreach my $task (@{$self->hook}) {
+        if ( (ref $task // '') ne 'CODE') {
+            croak "hook must be a CODE or ARRAY of CODEs";
         }
-        if ( scalar keys %$task != 1 ) {
-            croak "hook must be HASH ref with one key!"
-        }
-        my ($class, $config) = each %$task;
-        my $h = WebHook->new( $class, %$config );
-        $self->hook->[$i] = sub { $h->call(@_) };
     }
 
     $self->access([
@@ -238,20 +228,6 @@ L<WebHook> and L<WebHook::Filter>
 =item
 
 GitHub WebHooks are documented at L<http://developer.github.com/webhooks/>.
-
-=item
-
-GitHub does not include webhook event types in the payload but as HTTP request
-header C<X-GitHub-Event>. To only handle selected event types, use a
-conditional middleware:
-
-    build {
-        enable_if { ($_[0]->{HTTP_X_GITHUB_EVENT} // '') eq 'push' } 
-            Plack::App::GitHub::WebHook->new( hook => $push_hook );
-        enable_if { ($_[0]->{HTTP_X_GITHUB_EVENT} // '') eq 'issue' } 
-            Plack::App::GitHub::WebHook->new( hook => $issue_hook );
-        ...
-    };
 
 =item
 

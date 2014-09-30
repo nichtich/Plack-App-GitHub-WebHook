@@ -1,8 +1,8 @@
-use strict;
 package WebHook::Filter;
-#ABSTRACT: Filter WebHook payload on common criteria
-#VERSION
+use strict;
 use v5.10;
+
+our $VERSION = '0.4';
 
 use parent 'WebHook';
 
@@ -37,6 +37,13 @@ sub call {
     return 1;
 }
 
+1;
+__END__
+
+=head1 NAME
+
+WebHook::Filter - filter WebHook payload on common criteria
+
 =head1 SYNOPSIS
 
     my $app = Plack::App::WebHook->new(
@@ -56,8 +63,4 @@ sub call {
 This L<WebHook> can be used to check whether a webhook payload matches some
 defined criteria.
 
-=encoding utf8
-
 =cut
-
-1;

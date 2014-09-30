@@ -1,10 +1,11 @@
-use strict;
 package WebHook;
-#ABSTRACT: WebHook receiver
-#VERSION
+use strict;
 use v5.10;
+
 use Module::Load;
 use Module::Loaded;
+
+our $VERSION = '0.4';
 
 sub new {
     my ($class, %config);
@@ -38,6 +39,13 @@ sub run {
     my ($self, $payload, @config) = @_;
     $self->new(@config)->call($payload);
 }
+
+1;
+__END__
+
+=head1 NAME
+
+WebHook - WebHook receiver
 
 =head1 SYNOPSIS
     
@@ -89,5 +97,3 @@ GitHub webhooks.
 =encoding utf8
 
 =cut
-
-1;

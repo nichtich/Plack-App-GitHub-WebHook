@@ -1,7 +1,5 @@
-use strict;
 package Plack::App::GitHub::WebHook;
-#ABSTRACT: GitHub WebHook receiver as Plack application
-#VERSION
+use strict;
 use v5.10;
 use JSON qw(decode_json);
 
@@ -11,6 +9,8 @@ use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
 use WebHook;
+
+our $VERSION = '0.4';
 
 sub prepare_app {
     my $self = shift;
@@ -89,6 +89,13 @@ sub receive {
     } 
     return $ok;
 }
+
+1;
+__END__
+
+=head1 NAME
+
+Plack::App::GitHub::WebHook - GitHub WebHook receiver as Plack application
 
 =head1 SYNOPSIS
 
@@ -259,10 +266,27 @@ hooks. A listener as exemplified by the module can also be created like this:
 
 L<Net::GitHub> and L<Pithub> provide access to GitHub APIs.
 
+=item
+
+L<App::GitHubWebhooks2Ikachan> is an application that also receives GitHub WebHooks.
+
 =back
 
-=encoding utf8
+=begin markdown
+
+# STATUS
+
+[![Build Status](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook.png)](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook)
+[![Coverage Status](https://coveralls.io/repos/nichtich/Plack-App-GitHub-WebHook/badge.png?branch=master)](https://coveralls.io/r/nichtich/Plack-App-GitHub-WebHook?branch=master)
+
+=end markdown
+
+=head1 AUTHOR
+
+Jakob Voss C<< <jakob.voss@gbv.de> >>
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
 
 =cut
-
-1;

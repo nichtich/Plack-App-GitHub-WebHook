@@ -300,7 +300,11 @@ L<App::GitHubWebhooks2Ikachan> is an application that also receives GitHub WebHo
 
 =head1 AUTHOR
 
-Jakob Voss C<< <jakob.voss@gbv.de> >>
+Jakob Voss  E<lt>jakob.voss@gbv.deE<gt>
+
+=head1 COPYRIGHT
+
+Jakob Voss, 2014-
 
 =head1 LICENSE
 

@@ -4,7 +4,7 @@ use v5.10;
 use JSON qw(decode_json);
 
 use parent 'Plack::Component';
-use Plack::Util::Accessor qw(hook access app);
+use Plack::Util::Accessor qw(hook access app events);
 use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
@@ -47,7 +47,7 @@ sub prepare_app {
         )
     );
 
-    $self->init;
+    $self->init; # TODO: not documented: remove?
 }
 
 sub init { }
@@ -65,8 +65,12 @@ sub call_granted {
     }
 
     my $req = Plack::Request->new($env);
-
-    my $json = eval { decode_json $req->body_parameters->{payload} };
+    my $event = $env->{'X_GITHUB_EVENT'};
+    my $json;
+    
+    if ( !$self->events or grep { $event eq $_ } @{$self->events} ) {
+        $json = eval { decode_json $req->body_parameters->{payload} };
+    }
 
     if (!$json) {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
@@ -177,8 +181,8 @@ If the request was no HTTP POST.
 
 =item HTTP 400 Bad Request
 
-If the payload was no well-formed JSON. A later version of this module may add
-further validation.
+If the payload was no well-formed JSON or the C<X-GitHub-Event> header did not
+match configured events.
 
 =item HTTP 200 OK
 
@@ -215,6 +219,11 @@ Access restrictions, as passed to L<Plack::Middleware::Access>. See SYNOPSIS
 for the default value. A recent list of official GitHub WebHook IPs is vailable
 at L<https://api.github.com/meta>. One should only set the access value on
 instantiation, or manually call C<prepare_app> after modification.
+
+=item events
+
+A list of L<event types|http://developer.github.com/v3/activity/events/types/>
+expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
 
 =back
 

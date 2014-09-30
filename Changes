@@ -1,5 +1,9 @@
 # Change file for Plack::App::GitHub::WebHook
 
+{{$NEXT}}
+    - New option: events
+    - Migrated to Dist::Milla
+
 0.4 2014-01-09
     - Support multiple hooks, chained
 

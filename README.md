@@ -79,8 +79,8 @@ The response of a HTTP request to this application is one of:
 
 - HTTP 400 Bad Request
 
-    If the payload was no well-formed JSON. A later version of this module may add
-    further validation.
+    If the payload was no well-formed JSON or the `X-GitHub-Event` header did not
+    match configured events.
 
 - HTTP 200 OK
 
@@ -113,6 +113,11 @@ This module requires at least Perl 5.10.
     for the default value. A recent list of official GitHub WebHook IPs is vailable
     at [https://api.github.com/meta](https://api.github.com/meta). One should only set the access value on
     instantiation, or manually call `prepare_app` after modification.
+
+- events
+
+    A list of [event types](http://developer.github.com/v3/activity/events/types/)
+    expected to be send with the `X-GitHub-Event` header (e.g. `['pull']`).
 
 # SEE ALSO
 

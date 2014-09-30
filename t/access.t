@@ -18,6 +18,13 @@ $app->access([]);
 $res = request( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
 is $res->code, 200, 'empty access list';
 
+$app->events(['pull']);
+$res = request( '/', '{ }' );
+is $res->code, 400, 'wrong event type';
+
+$res = request( '/', '{ }', X_GITHUB_EVENT => 'pull' );
+is $res->code, 200, 'checked event type';
+
 $app->access([ deny => 'all' ]);
 $res = request( '/', '{ }', REMOTE_ADDR => '204.232.175.65' );
 is $res->code, 403, 'Forbidden';

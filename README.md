@@ -60,6 +60,33 @@ By default access is restricted to known GitHub WebHook IPs.
         }
     };
 
+## Synchronize with a GitHub repository
+
+The following application automatically pulls the master branch of a GitHub
+repository into a local working directory `$work_tree`.
+
+    use Git::Repository
+    use Plack::App::GitHub::WebHook;
+
+    Plack::App::GitHub::WebHook->new(
+        events => ['pull'],
+        safe => 1,
+        hook => [
+            sub { $_[0]->{ref} eq 'refs/heads/master' },
+            sub {
+                if ( -d "$work_tree/.git") {
+                    Git::Repository->new( work_tree => $work_tree )
+                                   ->run(qw(pull origin master));
+                } else {
+                    my $origin = $_[0]->{repository}->{clone_url};
+                    Git::Repository->run( 'clone', $origin, $work_tree );
+                }
+                1;
+            },
+            # sub { ...optional action after each pull... } 
+        ],
+    )->to_app;
+
 # DESCRIPTION
 
 This [PSGI](https://metacpan.org/pod/PSGI) application receives HTTP POST requests with body parameter
@@ -96,16 +123,21 @@ This module requires at least Perl 5.10.
 
 - hook
 
-    The hook can be any of a code reference, an array reference, or a hash
-    reference.
+    A code reference or an array of code references with tasks that are executed on
+    an incoming webhook.  Each task gets passed the encoded payload. If the task
+    returns a true value, next the task is called or HTTP status code 200 is
+    returned. Information can be passed from one task to the next by modifying the
+    payload. 
 
-    Each task gets passed the encoded payload. If the task returns a true value,
-    next the task is called or HTTP status code 200 is returned. Information can be
-    passed from one task to the next by modifying the payload. 
+    If a task returns a false value or if no task was given, HTTP status code 202
+    is returned immediately. This mechanism can be used for conditional hooks or to
+    detect hooks that were called successfully but failed to execute for some
+    reason.
 
-    If a task fails or no task was given, HTTP status code 202 is returned
-    immediately. This mechanism can be used for conditional hooks or to detect
-    hooks that were called successfully but failed to execute for some reason.
+- safe
+
+    Wrap all hook tasks in `eval { ... }` blocks to catch exceptions. A dying
+    task in safe mode is equivalent to a task that returns a false value.
 
 - access
 
@@ -121,20 +153,7 @@ This module requires at least Perl 5.10.
 
 # SEE ALSO
 
-- [WebHook](https://metacpan.org/pod/WebHook) and [WebHook::Filter](https://metacpan.org/pod/WebHook::Filter)
 - GitHub WebHooks are documented at [http://developer.github.com/webhooks/](http://developer.github.com/webhooks/).
-- GitHub does not include webhook event types in the payload but as HTTP request
-header `X-GitHub-Event`. To only handle selected event types, use a
-conditional middleware:
-
-        build {
-            enable_if { ($_[0]->{HTTP_X_GITHUB_EVENT} // '') eq 'push' } 
-                Plack::App::GitHub::WebHook->new( hook => $push_hook );
-            enable_if { ($_[0]->{HTTP_X_GITHUB_EVENT} // '') eq 'issue' } 
-                Plack::App::GitHub::WebHook->new( hook => $issue_hook );
-            ...
-        };
-
 - [WWW::GitHub::PostReceiveHook](https://metacpan.org/pod/WWW::GitHub::PostReceiveHook) uses [Web::Simple](https://metacpan.org/pod/Web::Simple) to receive GitHub web
 hooks. A listener as exemplified by the module can also be created like this:
 
@@ -165,4 +184,5 @@ Jakob Voss `<jakob.voss@gbv.de>`
 
 # LICENSE
 
-This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+This library is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.

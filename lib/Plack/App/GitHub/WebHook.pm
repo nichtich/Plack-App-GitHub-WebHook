@@ -4,12 +4,12 @@ use v5.10;
 use JSON qw(decode_json);
 
 use parent 'Plack::Component';
-use Plack::Util::Accessor qw(hook access app events);
+use Plack::Util::Accessor qw(hook access app events safe);
 use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
 
-our $VERSION = '0.4';
+our $VERSION = '0.5';
 
 sub prepare_app {
     my $self = shift;
@@ -76,12 +76,15 @@ sub call_granted {
 sub receive {
     my ($self, $payload) = @_;
 
-    my $ok;
     foreach my $hook (@{$self->{hook}}) {
-        return unless $hook->($payload);
-        $ok++;
+        if ($self->safe) {
+            return unless eval { $hook->($payload) } and !$@;
+        } else {
+            return unless $hook->($payload);
+        }
     } 
-    return $ok;
+
+    return scalar @{$self->{hook}};
 }
 
 1;
@@ -149,6 +152,32 @@ By default access is restricted to known GitHub WebHook IPs.
         }
     };
 
+=head2 Synchronize with a GitHub repository
+
+The following application automatically pulls the master branch of a GitHub
+repository into a local working directory C<$work_tree>.
+
+    use Git::Repository
+    use Plack::App::GitHub::WebHook;
+
+    Plack::App::GitHub::WebHook->new(
+        events => ['pull'],
+        safe => 1,
+        hook => [
+            sub { $_[0]->{ref} eq 'refs/heads/master' },
+            sub {
+                if ( -d "$work_tree/.git") {
+                    Git::Repository->new( work_tree => $work_tree )
+                                   ->run(qw(pull origin master));
+                } else {
+                    my $origin = $_[0]->{repository}->{clone_url};
+                    Git::Repository->run( 'clone', $origin, $work_tree );
+                }
+                1;
+            },
+            # sub { ...optional action after each pull... } 
+        ],
+    )->to_app;
 
 =head1 DESCRIPTION
 
@@ -192,16 +221,21 @@ This module requires at least Perl 5.10.
 
 =item hook
 
-The hook can be any of a code reference, an array reference, or a hash
-reference.
+A code reference or an array of code references with tasks that are executed on
+an incoming webhook.  Each task gets passed the encoded payload. If the task
+returns a true value, next the task is called or HTTP status code 200 is
+returned. Information can be passed from one task to the next by modifying the
+payload. 
 
-Each task gets passed the encoded payload. If the task returns a true value,
-next the task is called or HTTP status code 200 is returned. Information can be
-passed from one task to the next by modifying the payload. 
+If a task returns a false value or if no task was given, HTTP status code 202
+is returned immediately. This mechanism can be used for conditional hooks or to
+detect hooks that were called successfully but failed to execute for some
+reason.
 
-If a task fails or no task was given, HTTP status code 202 is returned
-immediately. This mechanism can be used for conditional hooks or to detect
-hooks that were called successfully but failed to execute for some reason.
+=item safe
+
+Wrap all hook tasks in C<< eval { ... } >> blocks to catch exceptions. A dying
+task in safe mode is equivalent to a task that returns a false value.
 
 =item access
 
@@ -215,15 +249,13 @@ instantiation, or manually call C<prepare_app> after modification.
 A list of L<event types|http://developer.github.com/v3/activity/events/types/>
 expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
 
+=cut
+
 =back
 
 =head1 SEE ALSO
 
 =over
-
-=item
-
-L<WebHook> and L<WebHook::Filter>
 
 =item
 
@@ -272,6 +304,7 @@ Jakob Voss C<< <jakob.voss@gbv.de> >>
 
 =head1 LICENSE
 
-This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+This library is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
 
 =cut

@@ -1,13 +1,14 @@
 package Plack::App::GitHub::WebHook;
 use strict;
+use warnings;
 use v5.10;
-use JSON qw(decode_json);
 
 use parent 'Plack::Component';
 use Plack::Util::Accessor qw(hook access app events safe);
 use Plack::Request;
 use Plack::Middleware::Access;
 use Carp qw(croak);
+use JSON qw(decode_json);
 
 our $VERSION = '0.5';
 

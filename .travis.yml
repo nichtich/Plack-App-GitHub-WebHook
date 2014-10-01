@@ -7,10 +7,15 @@ perl:
     - "5.12"
     - "5.10"
 install:
-    - cpanm --quiet --notest --skip-satisfied Devel::Cover
-    - cpanm --quiet --notest --skip-satisfied Dist::Milla Git::Repository
+    - cpanm --quiet --notest --skip-satisfied Dist::Milla
+    - cpanm --quiet --notest --skip-satisfied Git::Repository
     - cpanm --installdeps .
+
+# full release test
 script:
     - milla smoke --release --author
+
+# normal tests and report test coverage to coveralls.io
 after_success:
-    - cover -report coveralls
+    - cpanm --quiet --notest --skip-satisfied Devel::Cover::Report::Coveralls
+    - perl Build.PL && ./Build build && cover -test -report coveralls

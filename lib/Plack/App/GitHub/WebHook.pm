@@ -56,7 +56,7 @@ sub call_granted {
     }
 
     my $req = Plack::Request->new($env);
-    my $event = $env->{'X_GITHUB_EVENT'};
+    my $event = $env->{'X_GITHUB_EVENT'} // '';
     my $json;
     
     if ( !$self->events or grep { $event eq $_ } @{$self->events} ) {

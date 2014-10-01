@@ -94,6 +94,16 @@ __END__
 
 Plack::App::GitHub::WebHook - GitHub WebHook receiver as Plack application
 
+=begin markdown
+
+# STATUS
+
+[![Build Status](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook.png)](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook)
+[![Coverage Status](https://coveralls.io/repos/nichtich/Plack-App-GitHub-WebHook/badge.png?branch=master)](https://coveralls.io/r/nichtich/Plack-App-GitHub-WebHook?branch=master)
+[![Kwalitee Score](http://cpants.cpanauthors.org/dist/Plack-App-GitHub-WebHook.png)](http://cpants.cpanauthors.org/dist/Plack-App-GitHub-WebHook)
+
+=end markdown
+
 =head1 SYNOPSIS
 
 =head2 Basic usage
@@ -289,24 +299,9 @@ L<App::GitHubWebhooks2Ikachan> is an application that also receives GitHub WebHo
 
 =back
 
-=begin markdown
+=head1 COPYRIGHT AND LICENSE
 
-# STATUS
-
-[![Build Status](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook.png)](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook)
-[![Coverage Status](https://coveralls.io/repos/nichtich/Plack-App-GitHub-WebHook/badge.png?branch=master)](https://coveralls.io/r/nichtich/Plack-App-GitHub-WebHook?branch=master)
-
-=end markdown
-
-=head1 AUTHOR
-
-Jakob Voss  E<lt>jakob.voss@gbv.deE<gt>
-
-=head1 COPYRIGHT
-
-Jakob Voss, 2014-
-
-=head1 LICENSE
+Copyright Jakob Voss, 2014-
 
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

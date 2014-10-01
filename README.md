@@ -2,6 +2,12 @@
 
 Plack::App::GitHub::WebHook - GitHub WebHook receiver as Plack application
 
+# STATUS
+
+[![Build Status](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook.png)](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook)
+[![Coverage Status](https://coveralls.io/repos/nichtich/Plack-App-GitHub-WebHook/badge.png?branch=master)](https://coveralls.io/r/nichtich/Plack-App-GitHub-WebHook?branch=master)
+[![Kwalitee Score](http://cpants.cpanauthors.org/dist/Plack-App-GitHub-WebHook.png)](http://cpants.cpanauthors.org/dist/Plack-App-GitHub-WebHook)
+
 # SYNOPSIS
 
 ## Basic usage
@@ -173,16 +179,9 @@ hooks. A listener as exemplified by the module can also be created like this:
 - [Net::GitHub](https://metacpan.org/pod/Net::GitHub) and [Pithub](https://metacpan.org/pod/Pithub) provide access to GitHub APIs.
 - [App::GitHubWebhooks2Ikachan](https://metacpan.org/pod/App::GitHubWebhooks2Ikachan) is an application that also receives GitHub WebHooks.
 
-# STATUS
+# COPYRIGHT AND LICENSE
 
-[![Build Status](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook.png)](https://travis-ci.org/nichtich/Plack-App-GitHub-WebHook)
-[![Coverage Status](https://coveralls.io/repos/nichtich/Plack-App-GitHub-WebHook/badge.png?branch=master)](https://coveralls.io/r/nichtich/Plack-App-GitHub-WebHook?branch=master)
-
-# AUTHOR
-
-Jakob Voss `<jakob.voss@gbv.de>`
-
-# LICENSE
+Copyright Jakob Voss, 2014-
 
 This library is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

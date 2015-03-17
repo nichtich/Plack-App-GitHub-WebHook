@@ -264,6 +264,28 @@ expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
 
 =back
 
+=head1 DEPLOYMENT
+
+Many deployment methods exist. An easy option might be to use Apache webserver
+with mod_cgi and L<Plack::Handler::CGI>. First install Apache, Plack and
+Plack::App::GitHub::WebHook:
+
+    sudo apt-get install apache2
+    sudo apt-get install cpanminus libplack-perl
+    sudo cpanm Plack::App::GitHub::WebHook
+
+Then add this section to C</etc/apache2/sites-enabled/default> (or another host
+configuration) and restart apache afterwards (C<sudo service apache2 restart>):
+
+    <Directory /var/www/webhooks>
+       Options +ExecCGI -Indexes
+       AddHandler cgi-script .cgi
+    </Directory>
+
+You can now put webhook applications in directory C</var/www/webhooks> as long
+as they are executable, have file extension C<.cgi> and shebang line
+C<#!/usr/bin/env plackup>
+
 =head1 SEE ALSO
 
 =over

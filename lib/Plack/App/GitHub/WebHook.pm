@@ -10,7 +10,7 @@ use Plack::Middleware::Access;
 use Carp qw(croak);
 use JSON qw(decode_json);
 
-our $VERSION = '0.5';
+our $VERSION = '0.6';
 
 sub prepare_app {
     my $self = shift;
@@ -57,6 +57,7 @@ sub call_granted {
 
     my $req = Plack::Request->new($env);
     my $event = $env->{'X_GITHUB_EVENT'} // '';
+    my $delivery = $env->{'X_GITHUB_DELIVERY'} // '';
     my $json;
     
     if ( !$self->events or grep { $event eq $_ } @{$self->events} ) {
@@ -67,7 +68,7 @@ sub call_granted {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
     }
 
-    if ( $self->receive($json) ) {
+    if ( $self->receive($json, $event, $delivery) ) {
         return [200,['Content-Type'=>'text/plain','Content-Length'=>2],['OK']];
     } else {
         return [202,['Content-Type'=>'text/plain','Content-Length'=>8],['Accepted']];
@@ -75,13 +76,13 @@ sub call_granted {
 }
 
 sub receive {
-    my ($self, $payload) = @_;
+    my $self = shift;
 
     foreach my $hook (@{$self->{hook}}) {
         if ($self->safe) {
-            return unless eval { $hook->($payload) } and !$@;
+            return unless eval { $hook->(@_) } and !$@;
         } else {
-            return unless $hook->($payload);
+            return unless $hook->(@_);
         }
     } 
 
@@ -168,21 +169,24 @@ By default access is restricted to known GitHub WebHook IPs.
 The following application automatically pulls the master branch of a GitHub
 repository into a local working directory C<$work_tree>.
 
-    use Git::Repository
+    use Git::Repository;
     use Plack::App::GitHub::WebHook;
+
+    my $branch = "master;
+    my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
         events => ['pull'],
         safe => 1,
         hook => [
-            sub { $_[0]->{ref} eq 'refs/heads/master' },
+            sub { $_[0]->{ref} eq "refs/heads/$branch" },
             sub {
                 if ( -d "$work_tree/.git") {
                     Git::Repository->new( work_tree => $work_tree )
-                                   ->run(qw(pull origin master));
+                                   ->run( 'pull', origin => $branch );
                 } else {
                     my $origin = $_[0]->{repository}->{clone_url};
-                    Git::Repository->run( 'clone', $origin, $work_tree );
+                    Git::Repository->run( clone => $origin, -b => $branch, $work_tree );
                 }
                 1;
             },
@@ -233,10 +237,11 @@ This module requires at least Perl 5.10.
 =item hook
 
 A code reference or an array of code references with tasks that are executed on
-an incoming webhook.  Each task gets passed the encoded payload. If the task
-returns a true value, next the task is called or HTTP status code 200 is
-returned. Information can be passed from one task to the next by modifying the
-payload. 
+an incoming webhook.  Each task gets passed the encoded payload, the
+L<event|https://developer.github.com/webhooks/#events> and the unique delivery
+ID.  If the task returns a true value, next the task is called or HTTP status
+code 200 is returned.  Information can be passed from one task to the next by
+modifying the payload. 
 
 If a task returns a false value or if no task was given, HTTP status code 202
 is returned immediately. This mechanism can be used for conditional hooks or to

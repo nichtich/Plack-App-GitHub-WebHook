@@ -71,21 +71,24 @@ By default access is restricted to known GitHub WebHook IPs.
 The following application automatically pulls the master branch of a GitHub
 repository into a local working directory `$work_tree`.
 
-    use Git::Repository
+    use Git::Repository;
     use Plack::App::GitHub::WebHook;
+
+    my $branch = "master;
+    my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
         events => ['pull'],
         safe => 1,
         hook => [
-            sub { $_[0]->{ref} eq 'refs/heads/master' },
+            sub { $_[0]->{ref} eq "refs/heads/$branch" },
             sub {
                 if ( -d "$work_tree/.git") {
                     Git::Repository->new( work_tree => $work_tree )
-                                   ->run(qw(pull origin master));
+                                   ->run( 'pull', origin => $branch );
                 } else {
                     my $origin = $_[0]->{repository}->{clone_url};
-                    Git::Repository->run( 'clone', $origin, $work_tree );
+                    Git::Repository->run( clone => $origin, -b => $branch, $work_tree );
                 }
                 1;
             },
@@ -130,10 +133,11 @@ This module requires at least Perl 5.10.
 - hook
 
     A code reference or an array of code references with tasks that are executed on
-    an incoming webhook.  Each task gets passed the encoded payload. If the task
-    returns a true value, next the task is called or HTTP status code 200 is
-    returned. Information can be passed from one task to the next by modifying the
-    payload. 
+    an incoming webhook.  Each task gets passed the encoded payload, the
+    [event](https://developer.github.com/webhooks/#events) and the unique delivery
+    ID.  If the task returns a true value, next the task is called or HTTP status
+    code 200 is returned.  Information can be passed from one task to the next by
+    modifying the payload. 
 
     If a task returns a false value or if no task was given, HTTP status code 202
     is returned immediately. This mechanism can be used for conditional hooks or to
@@ -156,6 +160,29 @@ This module requires at least Perl 5.10.
 
     A list of [event types](http://developer.github.com/v3/activity/events/types/)
     expected to be send with the `X-GitHub-Event` header (e.g. `['pull']`).
+
+# DEPLOYMENT
+
+Many deployment methods exist. An easy option might be to use Apache webserver
+with mod\_cgi and [Plack::Handler::CGI](https://metacpan.org/pod/Plack::Handler::CGI). First install Apache, Plack and
+Plack::App::GitHub::WebHook:
+
+    sudo apt-get install apache2
+    sudo apt-get install cpanminus libplack-perl
+    sudo cpanm Plack::App::GitHub::WebHook
+
+Then add this section to `/etc/apache2/sites-enabled/default` (or another host
+configuration) and restart apache afterwards (`sudo service apache2 restart`):
+
+    <Directory /var/www/webhooks>
+       Options +ExecCGI -Indexes +SymLinksIfOwnerMatch
+       AddHandler cgi-script .cgi
+    </Directory>
+
+You can now put webhook applications in directory `/var/www/webhooks` as long
+as they are executable, have file extension `.cgi` and shebang line
+`#!/usr/bin/env plackup`. You might further want to run webhooks scripts as
+another user instead of `www-data` by using Apache module SuExec.
 
 # SEE ALSO
 

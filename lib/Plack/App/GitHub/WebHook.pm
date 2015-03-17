@@ -64,11 +64,19 @@ sub call_granted {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
     }
 
+    my ($status, $message);
+
     if ( $self->receive($json, $event, $delivery) ) {
-        return [200,['Content-Type'=>'text/plain','Content-Length'=>2],['OK']];
+        ($status, $message) = (200,"OK");
     } else {
-        return [202,['Content-Type'=>'text/plain','Content-Length'=>8],['Accepted']];
+        ($status, $message) = (202,"Accepted");
     }
+
+    $message = ucfirst($event)." $message" if $self->events;
+
+    [ $status,
+        [ 'Content-Type' => 'text/plain', 'Content-Length' => length $message ],
+        [$message] ];
 }
 
 sub receive {

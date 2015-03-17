@@ -278,13 +278,14 @@ Then add this section to C</etc/apache2/sites-enabled/default> (or another host
 configuration) and restart apache afterwards (C<sudo service apache2 restart>):
 
     <Directory /var/www/webhooks>
-       Options +ExecCGI -Indexes
+       Options +ExecCGI -Indexes +SymLinksIfOwnerMatch
        AddHandler cgi-script .cgi
     </Directory>
 
 You can now put webhook applications in directory C</var/www/webhooks> as long
 as they are executable, have file extension C<.cgi> and shebang line
-C<#!/usr/bin/env plackup>
+C<#!/usr/bin/env plackup>. You might further want to run webhooks scripts as
+another user instead of C<www-data> by using Apache module SuExec.
 
 =head1 SEE ALSO
 

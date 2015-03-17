@@ -69,7 +69,7 @@ By default access is restricted to known GitHub WebHook IPs.
 ## Synchronize with a GitHub repository
 
 The following application automatically pulls the master branch of a GitHub
-repository into a local working directory `$work_tree`.
+repository into a local working directory.
 
     use Git::Repository;
     use Plack::App::GitHub::WebHook;
@@ -78,16 +78,21 @@ repository into a local working directory `$work_tree`.
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
-        events => ['pull'],
+        events => ['pull','ping'],
         safe => 1,
         hook => [
-            sub { $_[0]->{ref} eq "refs/heads/$branch" },
+            sub { 
+                my ($payload, $method) = @_;
+                $method eq 'ping' or $payload->{ref} eq "refs/heads/$branch";
+            },
             sub {
+                my ($payload, $method) = @_;
+                return 1 if $method eq 'ping'; 
                 if ( -d "$work_tree/.git") {
                     Git::Repository->new( work_tree => $work_tree )
                                    ->run( 'pull', origin => $branch );
                 } else {
-                    my $origin = $_[0]->{repository}->{clone_url};
+                    my $origin = $payload->{repository}->{clone_url};
                     Git::Repository->run( clone => $origin, -b => $branch, $work_tree );
                 }
                 1;

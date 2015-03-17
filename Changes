@@ -1,6 +1,7 @@
 # Change file for Plack::App::GitHub::WebHook
 
 {{$NEXT}}
+    - Fixed payload parsing
     - Also pass event and delivery to hooks
     - added section on deployment
 

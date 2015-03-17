@@ -43,7 +43,7 @@ test_psgi $app, sub {
     }
 }
 JSON
-    my $res = $cb->(POST '/', [ payload => $payload ]);
+    my $res = $cb->(POST '/', Content => $payload);
 
     is $res->code, 200;
     ok -d "$work_tree/.git", "cloned repository";

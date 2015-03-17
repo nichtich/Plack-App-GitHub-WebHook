@@ -22,7 +22,7 @@ test_psgi $app, sub {
 
     is $payload, undef, 'hook not called';
 
-    $res = $cb->(POST '/', [ payload => '{"repository":{"name":"忍者"}}' ]);
+    $res = $cb->(POST '/', Content => '{"repository":{"name":"忍者"}}');
     is $res->code, 200, 'ok';
     is_deeply $payload, {repository=>{name=>decode_utf8 '忍者'}}, 'payload';
 };
@@ -44,7 +44,7 @@ my @apps = (
 
 test_psgi $_, sub {
     my $cb = shift;
-    my $res = $cb->(POST '/', [ payload => '{"repository":{"name":"海賊"}}' ]);
+    my $res = $cb->(POST '/', Content => '{"repository":{"name":"海賊"}}');
     is $res->code, 202, 'accepted (202)';
 } for @apps;
 

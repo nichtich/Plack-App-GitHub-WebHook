@@ -37,11 +37,7 @@ sub prepare_app {
             rules => $self->access
         )
     );
-
-    $self->init; # TODO: not documented: remove?
 }
-
-sub init { }
 
 sub call {
     my ($self, $env) = @_;
@@ -56,12 +52,12 @@ sub call_granted {
     }
 
     my $req = Plack::Request->new($env);
-    my $event = $env->{'X_GITHUB_EVENT'} // '';
-    my $delivery = $env->{'X_GITHUB_DELIVERY'} // '';
+    my $event = $env->{'HTTP_X_GITHUB_EVENT'} // '';
+    my $delivery = $env->{'HTTP_X_GITHUB_DELIVERY'} // '';
     my $json;
     
     if ( !$self->events or grep { $event eq $_ } @{$self->events} ) {
-        $json = eval { decode_json $req->body_parameters->{payload} };
+        $json = eval { decode_json $req->content };
     }
 
     if (!$json) {

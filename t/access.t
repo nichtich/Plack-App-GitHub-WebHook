@@ -22,7 +22,7 @@ $app->events(['pull']);
 $res = request( '/', '{ }' );
 is $res->code, 400, 'wrong event type';
 
-$res = request( '/', '{ }', X_GITHUB_EVENT => 'pull' );
+$res = request( '/', '{ }', HTTP_X_GITHUB_EVENT => 'pull' );
 is $res->code, 200, 'checked event type';
 
 $app->access([ deny => 'all' ]);
@@ -38,7 +38,7 @@ sub request {
     my $headers = ref $_[0] ? shift : [];
     my %psgi    = @_;
 
-    my $env = req_to_psgi( POST $url, { payload => $payload }, @$headers );
+    my $env = req_to_psgi( POST $url, Content => $payload, @$headers );
     $env->{$_} = $psgi{$_} for keys %psgi;
 
     return HTTP::Response->from_psgi( $app->to_app->($env) );

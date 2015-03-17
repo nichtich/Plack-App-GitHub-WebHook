@@ -63,10 +63,20 @@ sub call_granted {
     if (!$json) {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
     }
+    
+    my $log = sub {
+        $env->{'psgix.logger'}->({ level => $_[0], message => $_[1] });
+    };
+    my $logger = Plack::Util::inline_object(
+        debug => sub { $log->( debug => $_[0] ) },
+        info  => sub { $log->( info  => $_[0] ) },
+        warn  => sub { $log->( warn  => $_[0] ) },
+        error => sub { $log->( error => $_[0] ) },
+        fatal => sub { $log->( fatal => $_[0] ) },
+    );
 
     my ($status, $message);
-
-    if ( $self->receive($json, $event, $delivery) ) {
+    if ( $self->receive($json, $event, $delivery, $logger) ) {
         ($status, $message) = (200,"OK");
     } else {
         ($status, $message) = (202,"Accepted");
@@ -180,7 +190,7 @@ repository into a local working directory.
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
-        events => ['pull','ping'],
+        events => ['push','ping'],
         safe => 1,
         hook => [
             sub { 

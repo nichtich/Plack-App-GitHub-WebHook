@@ -78,7 +78,7 @@ repository into a local working directory.
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
-        events => ['pull','ping'],
+        events => ['push','ping'],
         safe => 1,
         hook => [
             sub { 

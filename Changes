@@ -2,7 +2,7 @@
 
 {{$NEXT}}
     - Fixed payload parsing
-    - Also pass event and delivery to hooks
+    - Also pass event, delivery and logger to hooks
     - added section on deployment
 
 0.5  2014-09-30 14:52:44 CEST

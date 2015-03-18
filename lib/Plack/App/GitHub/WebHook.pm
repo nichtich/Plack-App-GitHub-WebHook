@@ -6,11 +6,12 @@ use v5.10;
 use parent 'Plack::Component';
 use Plack::Util::Accessor qw(hook access app events safe);
 use Plack::Request;
+use Plack::Builder;
 use Plack::Middleware::Access;
 use Carp qw(croak);
 use JSON qw(decode_json);
 
-our $VERSION = '0.6';
+our $VERSION = '0.7';
 
 sub prepare_app {
     my $self = shift;
@@ -31,12 +32,11 @@ sub prepare_app {
         deny  => "all"
     ]) unless $self->access;
 
-    $self->app(
-        Plack::Middleware::Access->wrap(
-            sub { $self->call_granted($_[0]) },
-            rules => $self->access
-        )
-    );
+    $self->app( builder {
+        enable 'Access', rules => $self->access;
+        enable 'HTTPExceptions';
+        sub { $self->call_granted($_[0]) },
+    } );
 }
 
 sub call {
@@ -54,29 +54,22 @@ sub call_granted {
     my $req = Plack::Request->new($env);
     my $event = $env->{'HTTP_X_GITHUB_EVENT'} // '';
     my $delivery = $env->{'HTTP_X_GITHUB_DELIVERY'} // '';
-    my $json;
+    my $payload;
+    my ($status, $message);
     
     if ( !$self->events or grep { $event eq $_ } @{$self->events} ) {
-        $json = eval { decode_json $req->content };
+        $payload = eval { decode_json $req->content };
     }
 
-    if (!$json) {
+    if (!$payload) {
         return [400,['Content-Type'=>'text/plain','Content-Length'=>11],['Bad Request']];
     }
     
-    my $log = sub {
-        $env->{'psgix.logger'}->({ level => $_[0], message => $_[1] });
-    };
-    my $logger = Plack::Util::inline_object(
-        debug => sub { $log->( debug => $_[0] ) },
-        info  => sub { $log->( info  => $_[0] ) },
-        warn  => sub { $log->( warn  => $_[0] ) },
-        error => sub { $log->( error => $_[0] ) },
-        fatal => sub { $log->( fatal => $_[0] ) },
+    my $logger = Plack::App::GitHub::WebHook::Logger->new(
+        $env->{'psgix.logger'} || sub { }
     );
 
-    my ($status, $message);
-    if ( $self->receive($json, $event, $delivery, $logger) ) {
+    if ( $self->receive( [ $payload, $event, $delivery, $logger ], $env->{'psgi.errors'} ) ) {
         ($status, $message) = (200,"OK");
     } else {
         ($status, $message) = (202,"Accepted");
@@ -84,23 +77,59 @@ sub call_granted {
 
     $message = ucfirst($event)." $message" if $self->events;
 
-    [ $status,
+    return [ 
+        $status,
         [ 'Content-Type' => 'text/plain', 'Content-Length' => length $message ],
-        [$message] ];
+        [ $message ] 
+    ];
 }
 
 sub receive {
-    my $self = shift;
+    my ($self, $args, $error) = @_;
 
     foreach my $hook (@{$self->{hook}}) {
-        if ($self->safe) {
-            return unless eval { $hook->(@_) } and !$@;
-        } else {
-            return unless $hook->(@_);
+        if ( !eval { $hook->(@$args) } || $@ ) {
+            if ($self->safe) {
+                $error->print($@);
+            } else {
+                die Plack::App::GitHub::WebHook::Exception->new( 500, $@ );
+            }
+            return;
         }
     } 
 
     return scalar @{$self->{hook}};
+}
+
+{
+    package Plack::App::GitHub::WebHook::Logger;
+    sub new {
+        my $self = bless { logger => $_[1] }, $_[0];
+        foreach my $level (qw(debug info warn error fatal)) {
+            $self->{$level} = sub { $self->log( $level => $_[0] ) }
+        }
+        $self;
+    }
+    sub log {
+        my ($self, $level, $message) = @_;
+        chomp $message;
+        $self->{logger}->({ level => $level, message => $message });
+        1;
+    }
+    sub debug { $_[0]->log(debug => $_[1]) }
+    sub info  { $_[0]->log(info  => $_[1]) }
+    sub warn  { $_[0]->log(warn  => $_[1]) }
+    sub error { $_[0]->log(error => $_[1]) }
+    sub fatal { $_[0]->log(fatal => $_[1]) }
+}
+
+{
+    package Plack::App::GitHub::WebHook::Exception;
+    sub new {
+        bless { code => $_[1], message => $_[2] }, $_[0]; 
+    }
+    sub code { $_[0]->{code} }
+    sub to_string { $_[0]->{message} }
 }
 
 1;
@@ -269,8 +298,22 @@ reason.
 
 =item safe
 
-Wrap all hook tasks in C<< eval { ... } >> blocks to catch exceptions. A dying
-task in safe mode is equivalent to a task that returns a false value.
+Wrap all hook tasks in C<< eval { ... } >> blocks to catch exceptions.  Error
+messages are send to the PSGI error stream C<psgi.errors>.  A dying task in
+safe mode is equivalent to a task that returns a false value, so it will result
+in a HTTP 202 response.
+
+Plack::Middleware::HTTPExceptions
+
+If you want errors to result in a HTTP 500 response,
+wrap the application in an eval block such as this:
+
+    sub {
+        eval { $app->(@_) } || do {
+            my $msg = $@ || 'Server Error';
+            [ 500, [ 'Content-Length' => length $msg ], [ $msg ] ];
+        };
+    };
 
 =item access
 
@@ -299,7 +342,7 @@ Plack::App::GitHub::WebHook:
     sudo cpanm Plack::App::GitHub::WebHook
 
 Then add this section to C</etc/apache2/sites-enabled/default> (or another host
-configuration) and restart apache afterwards (C<sudo service apache2 restart>):
+configuration) and restart Apache.
 
     <Directory /var/www/webhooks>
        Options +ExecCGI -Indexes +SymLinksIfOwnerMatch

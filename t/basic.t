@@ -1,3 +1,5 @@
+use strict;
+use warnings;
 use Test::More;
 use Plack::Test;
 use HTTP::Request::Common;
@@ -34,11 +36,6 @@ my @apps = (
     ),
     Plack::App::GitHub::WebHook->new( 
         access => [ allow => 'all' ]
-    ),
-    Plack::App::GitHub::WebHook->new( 
-        access => [ allow => 'all' ],
-        safe => 1,
-        hook => sub { die; },
     ),
 );
 

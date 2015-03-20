@@ -89,10 +89,12 @@ sub receive {
 
     foreach my $hook (@{$self->{hook}}) {
         if ( !eval { $hook->(@$args) } || $@ ) {
-            if ($self->safe) {
-                $error->print($@);
-            } else {
-                die Plack::App::GitHub::WebHook::Exception->new( 500, $@ );
+            if ( $@ ) {
+                if ($self->safe) {
+                    $error->print($@);
+                } else {
+                    die Plack::App::GitHub::WebHook::Exception->new( 500, $@ );
+                }
             }
             return;
         }
@@ -125,11 +127,9 @@ sub receive {
 
 {
     package Plack::App::GitHub::WebHook::Exception;
-    sub new {
-        bless { code => $_[1], message => $_[2] }, $_[0]; 
-    }
+    use overload  '""' => sub { $_[0]->{message} };
+    sub new { bless { code => $_[1], message => $_[2] }, $_[0]; }
     sub code { $_[0]->{code} }
-    sub to_string { $_[0]->{message} }
 }
 
 1;
@@ -157,7 +157,7 @@ Plack::App::GitHub::WebHook - GitHub WebHook receiver as Plack application
 
     Plack::App::GitHub::WebHook->new(
         hook => sub {
-            my $payload = shift;
+            my ($payload, $event, $delivery, $logger) = @_;
             ...
         }
     )->to_app;
@@ -173,9 +173,11 @@ are called one by one until a task returns a false value.
     Plack::App::GitHub::WebHook->new(
         hook => [
             sub { $_[0]->{repository}{name} eq 'foo' }, # filter
-            { Filter => { repository_name => 'foo' } }, # equivalent filter
-            sub { my ($payload) = @_; ...  }, # some action
-            sub { run3 \@cmd ... }, # some more action
+            sub { # action
+                my ($payload, $event, $delivery, $logger) = @_;
+                run3 \@cmd, undef, $logger->{info}, $logger->{error}; 
+            },
+            sub { ...  }, # some more action
         ]
     )->to_app;
 
@@ -212,29 +214,31 @@ By default access is restricted to known GitHub WebHook IPs.
 The following application automatically pulls the master branch of a GitHub
 repository into a local working directory.
 
-    use Git::Repository;
     use Plack::App::GitHub::WebHook;
+    use IPC::Run3;
 
     my $branch = "master;
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
         events => ['push','ping'],
-        safe => 1,
         hook => [
             sub { 
-                my ($payload, $method) = @_;
-                $method eq 'ping' or $payload->{ref} eq "refs/heads/$branch";
+                my ($payload, $event, $delivery, $log) = @_;
+                $log->info("$event $delivery");
+                $event eq 'ping' or $payload->{ref} eq "refs/heads/$branch";
             },
             sub {
-                my ($payload, $method) = @_;
+                my ($payload, $event, $delivery, $log) = @_;
                 return 1 if $method eq 'ping'; 
                 if ( -d "$work_tree/.git") {
-                    Git::Repository->new( work_tree => $work_tree )
-                                   ->run( 'pull', origin => $branch );
+                    $log->info("pull $branch");
+                    chdir $work_tree;
+                    run3 ['git','pull',$origin,$branch], undef,
+                        $log->{info}, $log->{error};
                 } else {
-                    my $origin = $payload->{repository}->{clone_url};
-                    Git::Repository->run( clone => $origin, -b => $branch, $work_tree );
+                    run3 ['git','clone',$origin,'-b',$branch,$work_tree], undef,
+                        $log->{info}, $log->{error};
                 }
                 1;
             },
@@ -274,6 +278,10 @@ Otherwise, if the hook was called and returned a true value.
 
 Otherwise, if the hook was called and returned a false value.
 
+=item HTTP 500 Internal Server Error
+
+If a hook died with an exception, the error is returned as content body.                
+
 =back
 
 This module requires at least Perl 5.10.
@@ -287,9 +295,9 @@ This module requires at least Perl 5.10.
 A code reference or an array of code references with tasks that are executed on
 an incoming webhook.  Each task gets passed the encoded payload, the
 L<event|https://developer.github.com/webhooks/#events> and the unique delivery
-ID.  If the task returns a true value, next the task is called or HTTP status
-code 200 is returned.  Information can be passed from one task to the next by
-modifying the payload. 
+ID, and a L<logger object|/LOGGING>.  If the task returns a true value, next
+the task is called or HTTP status code 200 is returned.  Information can be
+passed from one task to the next by modifying the payload. 
 
 If a task returns a false value or if no task was given, HTTP status code 202
 is returned immediately. This mechanism can be used for conditional hooks or to
@@ -330,6 +338,29 @@ expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
 =cut
 
 =back
+
+=head1 LOGGING
+
+Each hook is passed a logging object as fourth parameter. It provides logging
+methods for each log level and a general log method:
+
+    sub sample_hook {
+        my ($payload, $event, $delivery, $log) = @_;
+
+        $log->debug('message');  $log->{debug}->('message');
+        $log->info('message');   $log->{info}->('message');
+        $log->warn('message');   $log->{warn}->('message');
+        $log->error('message');  $log->{error}->('message');
+        $log->fatal('message');  $log->{fatal}->('message');
+
+        $log->log( warn => 'message' );
+
+        run3 \@system_command, undef,
+            $log->{info},   # STDOUT to log level info
+            $log->{error};  # STDERR to log level error
+    }
+
+Trailing newlines on log messages are trimmed.
 
 =head1 DEPLOYMENT
 

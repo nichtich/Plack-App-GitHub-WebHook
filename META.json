@@ -56,7 +56,7 @@
          "web" : "https://github.com/nichtich/Plack-App-GitHub-WebHook"
       }
    },
-   "version" : "0.6",
+   "version" : "0.7",
    "x_contributors" : [
       "Jakob Voss <jakob@nichtich.de>",
       "Jakob Voss <voss@gbv.de>",

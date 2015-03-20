@@ -16,7 +16,7 @@ Plack::App::GitHub::WebHook - GitHub WebHook receiver as Plack application
 
     Plack::App::GitHub::WebHook->new(
         hook => sub {
-            my $payload = shift;
+            my ($payload, $event, $delivery, $logger) = @_;
             ...
         }
     )->to_app;
@@ -32,9 +32,11 @@ are called one by one until a task returns a false value.
     Plack::App::GitHub::WebHook->new(
         hook => [
             sub { $_[0]->{repository}{name} eq 'foo' }, # filter
-            { Filter => { repository_name => 'foo' } }, # equivalent filter
-            sub { my ($payload) = @_; ...  }, # some action
-            sub { run3 \@cmd ... }, # some more action
+            sub { # action
+                my ($payload, $event, $delivery, $logger) = @_;
+                run3 \@cmd, undef, $logger->{info}, $logger->{error}; 
+            },
+            sub { ...  }, # some more action
         ]
     )->to_app;
 
@@ -71,29 +73,31 @@ By default access is restricted to known GitHub WebHook IPs.
 The following application automatically pulls the master branch of a GitHub
 repository into a local working directory.
 
-    use Git::Repository;
     use Plack::App::GitHub::WebHook;
+    use IPC::Run3;
 
     my $branch = "master;
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
         events => ['push','ping'],
-        safe => 1,
         hook => [
             sub { 
-                my ($payload, $method) = @_;
-                $method eq 'ping' or $payload->{ref} eq "refs/heads/$branch";
+                my ($payload, $event, $delivery, $log) = @_;
+                $log->info("$event $delivery");
+                $event eq 'ping' or $payload->{ref} eq "refs/heads/$branch";
             },
             sub {
-                my ($payload, $method) = @_;
+                my ($payload, $event, $delivery, $log) = @_;
                 return 1 if $method eq 'ping'; 
                 if ( -d "$work_tree/.git") {
-                    Git::Repository->new( work_tree => $work_tree )
-                                   ->run( 'pull', origin => $branch );
+                    $log->info("pull $branch");
+                    chdir $work_tree;
+                    run3 ['git','pull',$origin,$branch], undef,
+                        $log->{info}, $log->{error};
                 } else {
-                    my $origin = $payload->{repository}->{clone_url};
-                    Git::Repository->run( clone => $origin, -b => $branch, $work_tree );
+                    run3 ['git','clone',$origin,'-b',$branch,$work_tree], undef,
+                        $log->{info}, $log->{error};
                 }
                 1;
             },
@@ -131,6 +135,10 @@ The response of a HTTP request to this application is one of:
 
     Otherwise, if the hook was called and returned a false value.
 
+- HTTP 500 Internal Server Error
+
+    If a hook died with an exception, the error is returned as content body.                
+
 This module requires at least Perl 5.10.
 
 # CONFIGURATION
@@ -140,9 +148,9 @@ This module requires at least Perl 5.10.
     A code reference or an array of code references with tasks that are executed on
     an incoming webhook.  Each task gets passed the encoded payload, the
     [event](https://developer.github.com/webhooks/#events) and the unique delivery
-    ID.  If the task returns a true value, next the task is called or HTTP status
-    code 200 is returned.  Information can be passed from one task to the next by
-    modifying the payload. 
+    ID, and a [logger object](#logging).  If the task returns a true value, next
+    the task is called or HTTP status code 200 is returned.  Information can be
+    passed from one task to the next by modifying the payload. 
 
     If a task returns a false value or if no task was given, HTTP status code 202
     is returned immediately. This mechanism can be used for conditional hooks or to
@@ -151,8 +159,22 @@ This module requires at least Perl 5.10.
 
 - safe
 
-    Wrap all hook tasks in `eval { ... }` blocks to catch exceptions. A dying
-    task in safe mode is equivalent to a task that returns a false value.
+    Wrap all hook tasks in `eval { ... }` blocks to catch exceptions.  Error
+    messages are send to the PSGI error stream `psgi.errors`.  A dying task in
+    safe mode is equivalent to a task that returns a false value, so it will result
+    in a HTTP 202 response.
+
+    Plack::Middleware::HTTPExceptions
+
+    If you want errors to result in a HTTP 500 response,
+    wrap the application in an eval block such as this:
+
+        sub {
+            eval { $app->(@_) } || do {
+                my $msg = $@ || 'Server Error';
+                [ 500, [ 'Content-Length' => length $msg ], [ $msg ] ];
+            };
+        };
 
 - access
 
@@ -166,6 +188,29 @@ This module requires at least Perl 5.10.
     A list of [event types](http://developer.github.com/v3/activity/events/types/)
     expected to be send with the `X-GitHub-Event` header (e.g. `['pull']`).
 
+# LOGGING
+
+Each hook is passed a logging object as fourth parameter. It provides logging
+methods for each log level and a general log method:
+
+    sub sample_hook {
+        my ($payload, $event, $delivery, $log) = @_;
+
+        $log->debug('message');  $log->{debug}->('message');
+        $log->info('message');   $log->{info}->('message');
+        $log->warn('message');   $log->{warn}->('message');
+        $log->error('message');  $log->{error}->('message');
+        $log->fatal('message');  $log->{fatal}->('message');
+
+        $log->log( warn => 'message' );
+
+        run3 \@system_command, undef,
+            $log->{info},   # STDOUT to log level info
+            $log->{error};  # STDERR to log level error
+    }
+
+Trailing newlines on log messages are trimmed.
+
 # DEPLOYMENT
 
 Many deployment methods exist. An easy option might be to use Apache webserver
@@ -177,7 +222,7 @@ Plack::App::GitHub::WebHook:
     sudo cpanm Plack::App::GitHub::WebHook
 
 Then add this section to `/etc/apache2/sites-enabled/default` (or another host
-configuration) and restart apache afterwards (`sudo service apache2 restart`):
+configuration) and restart Apache.
 
     <Directory /var/www/webhooks>
        Options +ExecCGI -Indexes +SymLinksIfOwnerMatch

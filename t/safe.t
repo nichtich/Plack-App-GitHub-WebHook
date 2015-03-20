@@ -25,10 +25,10 @@ $app = Plack::App::GitHub::WebHook->new(
     hook => sub { die "WTF?!\n"; },
 );
 
-is_deeply $app->($env), [
-   500,
-   [ 'Content-Length' => 6, 'Content-Length' => 7 ],
-   [ "WTF?!\n" ]
- ], 'not safe, 500 response';
+$res = $app->($env);
+is $res->[0], '500', 'not safe: 500 response';
+is $res->[2]->[0], "WTF?!\n", 'not safe: return error';
+
+note explain $res;
 
 done_testing;    

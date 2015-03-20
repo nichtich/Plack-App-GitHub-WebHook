@@ -230,16 +230,17 @@ repository into a local working directory.
             },
             sub {
                 my ($payload, $event, $delivery, $log) = @_;
-                return 1 if $method eq 'ping'; 
+                my $origin = $payload->{repository}->{clone_url} 
+                           or die "missing clone_url\n";
+                my $cmd;
                 if ( -d "$work_tree/.git") {
-                    $log->info("pull $branch");
                     chdir $work_tree;
-                    run3 ['git','pull',$origin,$branch], undef,
-                        $log->{info}, $log->{error};
+                    $cmd = ['git','pull',$origin,$branch];
                 } else {
-                    run3 ['git','clone',$origin,'-b',$branch,$work_tree], undef,
-                        $log->{info}, $log->{error};
+                    $cmd = ['git','clone',$origin,'-b',$branch,$work_tree];
                 }
+                $log->info(join ' ', '$', @$cmd);
+                run3 $cmd, undef, $log->{info}, $log->{error};
                 1;
             },
             # sub { ...optional action after each pull... } 

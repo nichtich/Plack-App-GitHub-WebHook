@@ -1,6 +1,7 @@
 # Change file for Plack::App::GitHub::WebHook
 
 {{$NEXT}}
+    - document logging 
 
 0.6  2015-03-17 14:12:45 CET
     - Fixed payload parsing

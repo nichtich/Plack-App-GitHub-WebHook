@@ -8,6 +8,7 @@ perl:
 install:
     - cpanm --quiet --notest --skip-satisfied Dist::Milla
     - cpanm --quiet --notest --skip-satisfied Git::Repository
+    - cpanm --quiet --notest --skip-satisfied Plack::Middleware::HubSignature
     - cpanm --installdeps .
 
 # full release test

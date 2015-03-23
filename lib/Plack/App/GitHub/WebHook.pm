@@ -80,7 +80,8 @@ sub call_granted {
     my ($status, $message);
     
     if ( !$self->events or grep { $event eq $_ } @{$self->events} ) {
-        $payload = eval { decode_json $req->content };
+        $payload = $req->param('payload') || $req->content;
+        $payload = eval { decode_json $payload };
     }
 
     if (!$payload) {

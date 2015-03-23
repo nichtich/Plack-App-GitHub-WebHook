@@ -24,9 +24,12 @@ test_psgi $app, sub {
 
     is $payload, undef, 'hook not called';
 
-    $res = $cb->(POST '/', Content => '{"repository":{"name":"忍者"}}');
-    is $res->code, 200, 'ok';
-    is_deeply $payload, {repository=>{name=>decode_utf8 '忍者'}}, 'payload';
+    foreach ( [ Content => '{"repository":{"name":"忍者"}}' ],
+              [ [ payload => '{"repository":{"name":"忍者"}}' ] ] ) { 
+        $res = $cb->(POST '/', @$_);
+        is $res->code, 200, 'ok';
+        is_deeply $payload, {repository=>{name=>decode_utf8 '忍者'}}, 'payload';
+    }
 };
 
 my @apps = (

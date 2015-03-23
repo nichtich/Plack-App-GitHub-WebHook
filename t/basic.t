@@ -45,7 +45,7 @@ test_psgi $_, sub {
     is $res->code, 202, 'accepted (202)';
 } for @apps;
 
-eval { Plack::App::GitHub::WebHook->new( hook => 1 )->prepare_app; };
+eval { Plack::App::GitHub::WebHook->new( hook => 1 )->to_app; };
 ok $@, "bad constructor";
 
 done_testing;

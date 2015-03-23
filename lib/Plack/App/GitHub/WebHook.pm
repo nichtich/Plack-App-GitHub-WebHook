@@ -4,7 +4,7 @@ use warnings;
 use v5.10;
 
 use parent 'Plack::Component';
-use Plack::Util::Accessor qw(hook access app events safe);
+use Plack::Util::Accessor qw(hook access app events safe secret);
 use Plack::Request;
 use Plack::Builder;
 use Plack::Middleware::Access;
@@ -13,7 +13,7 @@ use JSON qw(decode_json);
 
 our $VERSION = '0.7';
 
-sub prepare_app {
+sub to_app {
     my $self = shift;
 
     if ( (ref $self->hook // '') ne 'ARRAY' ) {
@@ -25,23 +25,27 @@ sub prepare_app {
             croak "hook must be a CODE or ARRAY of CODEs";
         }
     }
-
+    
     $self->access([
         allow => "204.232.175.64/27",
         allow => "192.30.252.0/22",
         deny  => "all"
     ]) unless $self->access;
 
-    $self->app( builder {
+    my $app = builder {
         enable 'Access', rules => $self->access;
         enable 'HTTPExceptions';
-        sub { $self->call_granted($_[0]) },
-    } );
-}
+        sub { $self->call_granted($_[0]) }
+    };
 
-sub call {
-    my ($self, $env) = @_;
-    $self->app->($env);
+    if ($self->secret) {
+        require Plack::Middleware::HubSignature;
+        $app = Plack::Middleware::HubSignature->wrap($app,
+            secret => $self->secret
+        );
+    }
+
+    $app;
 }
 
 sub call_granted {
@@ -323,6 +327,12 @@ wrap the application in an eval block such as this:
             [ 500, [ 'Content-Length' => length $msg ], [ $msg ] ];
         };
     };
+
+=item secret
+
+Secret token set at github Webhook setting to validate payload.  See
+L<https://developer.github.com/webhooks/securing/> for details. Requires
+L<Plack::Middleware::HubSignature>.
 
 =item access
 

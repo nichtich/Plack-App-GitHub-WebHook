@@ -1,6 +1,8 @@
 # Change file for Plack::App::GitHub::WebHook
 
 {{$NEXT}}
+
+0.8  2015-03-23 12:48:25 CET
     - introduced plugin mechanism for GitHub::WebHook hooks
     - support both JSON content and JSON parameter 'payload'
     - improve 'access' parameter

@@ -10,29 +10,25 @@ Plack::App::GitHub::WebHook - GitHub WebHook receiver as Plack application
 
 # SYNOPSIS
 
-## Basic usage
-
     use Plack::App::GitHub::WebHook;
 
+    # Basic Usage
     Plack::App::GitHub::WebHook->new(
         hook => sub {
-            my ($payload, $event, $delivery, $logger) = @_;
+            my $payload = shift;
             ...
-        }
+        },
+        events => ['pull'],  # optional
+        secret => $secret,   # optional
+        access => 'github',  # default
     )->to_app;
 
-## Multiple task hooks
-
-A hook can consist of multiple tasks, given by an array reference. The tasks
-are called one by one until a task returns a false value.
-
-    use Plack::App::GitHub::WebHook;
+    # Multiple hooks
     use IPC::Run3;
-
     Plack::App::GitHub::WebHook->new(
         hook => [
-            sub { $_[0]->{repository}{name} eq 'foo' }, # filter
-            sub { # action
+            sub { $_[0]->{repository}{name} eq 'foo' },
+            sub {
                 my ($payload, $event, $delivery, $logger) = @_;
                 run3 \@cmd, undef, $logger->{info}, $logger->{error}; 
             },
@@ -40,33 +36,161 @@ are called one by one until a task returns a false value.
         ]
     )->to_app;
 
-## Access restriction    
+# DESCRIPTION
 
-By default access is restricted to known GitHub WebHook IPs.
+This [PSGI](https://metacpan.org/pod/PSGI) application receives HTTP POST requests with body parameter
+`payload` set to a JSON object. The default use case is to receive 
+[GitHub WebHooks](http://developer.github.com/webhooks/), for instance
+[PushEvents](http://developer.github.com/v3/activity/events/types/#pushevent).
 
-    Plack::App::GitHub::WebHook->new(
-        hook => sub { ... },
+The response of a HTTP request to this application is one of:
+
+- HTTP 403 Forbidden
+
+    If access was not granted (for instance because it did not origin from GitHub).
+
+- HTTP 405 Method Not Allowed
+
+    If the request was no HTTP POST.
+
+- HTTP 400 Bad Request
+
+    If the payload was no well-formed JSON or the `X-GitHub-Event` header did not
+    match configured events.
+
+- HTTP 200 OK
+
+    Otherwise, if the hook was called and returned a true value.
+
+- HTTP 202 Accepted
+
+    Otherwise, if the hook was called and returned a false value.
+
+- HTTP 500 Internal Server Error
+
+    If a hook died with an exception, the error is returned as content body. Use
+    configuration parameter `safe` to disable HTTP 500 errors. 
+
+This module requires at least Perl 5.10.
+
+# CONFIGURATION
+
+- hook
+
+    A hook can be any of a code reference, an object instance with method `code`,
+    a class name, or a class name mapped to parameters. You can also pass a list of
+    hooks as array reference. Class names are prepended by [GitHub::WebHook](https://metacpan.org/pod/GitHub::WebHook)
+    unless prepended by `+`.
+
+        hook => sub {
+            my ($payload, $event, $delivery, $logger) = @_;
+            ...
+        }
+
+        hook => 'Foo'
+        hook => '+GitHub::WebHook::Foo'
+        hook => GitHub::WebHook::Foo->new
+
+        hook => { Bar => [ doz => 'baz' ] }
+        hook => GitHub::WebHook::Bar->new( doz => 'baz' )
+        
+
+    Each hook gets passed the encoded payload, the type of webhook
+    [event](https://developer.github.com/webhooks/#events), a unique delivery ID,
+    and a [logger object](#logging).  If the hook returns a true value, the next
+    the hook is called or HTTP status code 200 is returned.  If a hook returns a
+    false value (or if no hook was given), HTTP status code 202 is returned
+    immediately.  Information can be passed from one hook to the next by modifying
+    the payload. 
+
+- events
+
+    A list of [event types](http://developer.github.com/v3/activity/events/types/)
+    expected to be send with the `X-GitHub-Event` header (e.g. `['pull']`).
+
+- secret
+
+    Secret token set at GitHub Webhook setting to validate payload.  See
+    [https://developer.github.com/webhooks/securing/](https://developer.github.com/webhooks/securing/) for details. Requires
+    [Plack::Middleware::HubSignature](https://metacpan.org/pod/Plack::Middleware::HubSignature).
+
+- access
+
+    Access restrictions, as passed to [Plack::Middleware::Access](https://metacpan.org/pod/Plack::Middleware::Access). A recent list
+    of official GitHub WebHook IPs is vailable at [https://api.github.com/meta](https://api.github.com/meta).
+    The default value
+
+        access => 'github'
+
+    is a shortcut for these official IP ranges
+
         access => [
             allow => "204.232.175.64/27",
             allow => "192.30.252.0/22",
             deny  => 'all'
         ]
-    )->to_app;
 
-    # this is equivalent to
-    use Plack::Builder;
-    builder {
-        mount 'notify' => builder {
-            enable 'Access', rules => [
-                allow => "204.232.175.64/27",
-                allow => "192.30.252.0/22",
-                deny  => 'all'
-            ]
-            Plack::App::GitHub::WebHook->new(
-                hook => sub { ... }
-            );
-        }
-    };
+    and
+
+        access => [
+            allow => 'github',
+            ...
+        ]
+
+    is a shortcut for
+
+        access => [
+            allow => "204.232.175.64/27",
+            allow => "192.30.252.0/22",
+            ...
+        ]
+
+    To disable access control via IP ranges use any of
+
+        access => 'all'
+        access => []
+
+- safe
+
+    Wrap all hooks in `eval { ... }` blocks to catch exceptions.  Error
+    messages are send to the PSGI error stream `psgi.errors`.  A dying hook in
+    safe mode is equivalent to a hook that returns a false value, so it will result
+    in a HTTP 202 response.
+
+    If you want errors to result in a HTTP 500 response, don't use this option but
+    wrap the application in an eval block such as this:
+
+        sub {
+            eval { $app->(@_) } || do {
+                my $msg = $@ || 'Server Error';
+                [ 500, [ 'Content-Length' => length $msg ], [ $msg ] ];
+            };
+        };
+
+# LOGGING
+
+Each hook is passed a logging object as fourth parameter. It provides logging
+methods for each log level and a general log method:
+
+    sub sample_hook {
+        my ($payload, $event, $delivery, $log) = @_;
+
+        $log->debug('message');  $log->{debug}->('message');
+        $log->info('message');   $log->{info}->('message');
+        $log->warn('message');   $log->{warn}->('message');
+        $log->error('message');  $log->{error}->('message');
+        $log->fatal('message');  $log->{fatal}->('message');
+
+        $log->log( warn => 'message' );
+
+        run3 \@system_command, undef,
+            $log->{info},   # STDOUT to log level info
+            $log->{error};  # STDERR to log level error
+    }
+
+Trailing newlines on log messages are trimmed.
+
+# EXAMPLES
 
 ## Synchronize with a GitHub repository
 
@@ -105,112 +229,6 @@ repository into a local working directory.
             # sub { ...optional action after each pull... } 
         ],
     )->to_app;
-
-# DESCRIPTION
-
-This [PSGI](https://metacpan.org/pod/PSGI) application receives HTTP POST requests with body parameter
-`payload` set to a JSON object. The default use case is to receive 
-[GitHub WebHooks](http://developer.github.com/webhooks/), for instance
-[PushEvents](http://developer.github.com/v3/activity/events/types/#pushevent).
-
-The response of a HTTP request to this application is one of:
-
-- HTTP 403 Forbidden
-
-    If access was not granted (for instance because it did not origin from GitHub).
-
-- HTTP 405 Method Not Allowed
-
-    If the request was no HTTP POST.
-
-- HTTP 400 Bad Request
-
-    If the payload was no well-formed JSON or the `X-GitHub-Event` header did not
-    match configured events.
-
-- HTTP 200 OK
-
-    Otherwise, if the hook was called and returned a true value.
-
-- HTTP 202 Accepted
-
-    Otherwise, if the hook was called and returned a false value.
-
-- HTTP 500 Internal Server Error
-
-    If a hook died with an exception, the error is returned as content body.                
-
-This module requires at least Perl 5.10.
-
-# CONFIGURATION
-
-- hook
-
-    A code reference or an array of code references with tasks that are executed on
-    an incoming webhook.  Each task gets passed the encoded payload, the
-    [event](https://developer.github.com/webhooks/#events) and the unique delivery
-    ID, and a [logger object](#logging).  If the task returns a true value, next
-    the task is called or HTTP status code 200 is returned.  Information can be
-    passed from one task to the next by modifying the payload. 
-
-    If a task returns a false value or if no task was given, HTTP status code 202
-    is returned immediately. This mechanism can be used for conditional hooks or to
-    detect hooks that were called successfully but failed to execute for some
-    reason.
-
-- safe
-
-    Wrap all hook tasks in `eval { ... }` blocks to catch exceptions.  Error
-    messages are send to the PSGI error stream `psgi.errors`.  A dying task in
-    safe mode is equivalent to a task that returns a false value, so it will result
-    in a HTTP 202 response.
-
-    Plack::Middleware::HTTPExceptions
-
-    If you want errors to result in a HTTP 500 response,
-    wrap the application in an eval block such as this:
-
-        sub {
-            eval { $app->(@_) } || do {
-                my $msg = $@ || 'Server Error';
-                [ 500, [ 'Content-Length' => length $msg ], [ $msg ] ];
-            };
-        };
-
-- access
-
-    Access restrictions, as passed to [Plack::Middleware::Access](https://metacpan.org/pod/Plack::Middleware::Access). See SYNOPSIS
-    for the default value. A recent list of official GitHub WebHook IPs is vailable
-    at [https://api.github.com/meta](https://api.github.com/meta). One should only set the access value on
-    instantiation, or manually call `prepare_app` after modification.
-
-- events
-
-    A list of [event types](http://developer.github.com/v3/activity/events/types/)
-    expected to be send with the `X-GitHub-Event` header (e.g. `['pull']`).
-
-# LOGGING
-
-Each hook is passed a logging object as fourth parameter. It provides logging
-methods for each log level and a general log method:
-
-    sub sample_hook {
-        my ($payload, $event, $delivery, $log) = @_;
-
-        $log->debug('message');  $log->{debug}->('message');
-        $log->info('message');   $log->{info}->('message');
-        $log->warn('message');   $log->{warn}->('message');
-        $log->error('message');  $log->{error}->('message');
-        $log->fatal('message');  $log->{fatal}->('message');
-
-        $log->log( warn => 'message' );
-
-        run3 \@system_command, undef,
-            $log->{info},   # STDOUT to log level info
-            $log->{error};  # STDERR to log level error
-    }
-
-Trailing newlines on log messages are trimmed.
 
 # DEPLOYMENT
 
@@ -255,7 +273,8 @@ hooks. A listener as exemplified by the module can also be created like this:
         };
 
 - [Net::GitHub](https://metacpan.org/pod/Net::GitHub) and [Pithub](https://metacpan.org/pod/Pithub) provide access to GitHub APIs.
-- [App::GitHubWebhooks2Ikachan](https://metacpan.org/pod/App::GitHubWebhooks2Ikachan) is an application that also receives GitHub WebHooks.
+- [Github::Hooks::Receiver](https://metacpan.org/pod/Github::Hooks::Receiver) and [App::GitHubWebhooks2Ikachan](https://metacpan.org/pod/App::GitHubWebhooks2Ikachan) are alternative
+application that receive GitHub WebHooks.
 
 # COPYRIGHT AND LICENSE
 

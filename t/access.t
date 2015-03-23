@@ -7,40 +7,59 @@ use HTTP::Response;
 
 use Plack::App::GitHub::WebHook;
 
-my $app = Plack::App::GitHub::WebHook->new( hook => sub { 1 } );
+my ($app, $code);
+sub call {
+    my ($url, $payload, %psgi) = @_;
+    my $env = req_to_psgi( POST $url, Content => $payload);
+    $env->{$_} = $psgi{$_} for keys %psgi;
+    $app->to_app->($env)->[0]
+}
 
-my $res = request( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
-is $res->code, 403, 'Forbidden';
+{
+    foreach (undef, 'github') {
+        $app = Plack::App::GitHub::WebHook->new;
+        $code = call( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
+        is $code, 403, 'Forbidden';
 
-$res = request( '/', '{ }', REMOTE_ADDR => '204.232.175.65' );
-is $res->code, 200, 'Ok';
+        $code = call( '/', '{ }', REMOTE_ADDR => '204.232.175.65' );
+        is $code, 202, 'Accepted';
+    }
+    
+    $app = Plack::App::GitHub::WebHook->new( 
+        access => [ 
+            allow => 'github', 
+            allow => '1.1.1.1',
+            deny => 'all',
+        ]
+    );
+    
+    $code = call( '/', '{ }', REMOTE_ADDR => '204.232.175.65' );
+    is $code, 202, 'Accepted';
 
-$app->access([]);
-$res = request( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
-is $res->code, 200, 'empty access list';
+    $code = call( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
+    is $code, 202, 'Accepted';
 
-$app->events(['pull']);
-$res = request( '/', '{ }' );
-is $res->code, 400, 'wrong event type';
+    $code = call( '/', '{ }', REMOTE_ADDR => '1.1.1.2' );
+    is $code, 403, 'Forbidden';
+    
+    foreach ([], 'all') {
+        $app = Plack::App::GitHub::WebHook->new( access => $_ );
+        $code = call( '/', '{ }', REMOTE_ADDR => '1.1.1.1' );
+        is $code, 202, 'access all';
+    }
+}
 
-$res = request( '/', '{ }', HTTP_X_GITHUB_EVENT => 'pull' );
-is $res->code, 200, 'checked event type';
+{
+    $app->events(['pull']);
+    $code = call( '/', '{ }' );
+    is $code, 400, 'wrong event type';
 
-$app->access([ deny => 'all' ]);
-$res = request( '/', '{ }', REMOTE_ADDR => '204.232.175.65' );
-is $res->code, 403, 'Forbidden';
+    $code = call( '/', '{ }', HTTP_X_GITHUB_EVENT => 'pull' );
+    is $code, 202, 'checked event type';
+
+    $app->access([ deny => 'all' ]);
+    $code = call( '/', '{ }', REMOTE_ADDR => '204.232.175.65' );
+    is $code, 403, 'Forbidden';
+}
 
 done_testing;
-
-# helper method
-sub request {
-    my $url     = shift;
-    my $payload = shift;
-    my $headers = ref $_[0] ? shift : [];
-    my %psgi    = @_;
-
-    my $env = req_to_psgi( POST $url, Content => $payload, @$headers );
-    $env->{$_} = $psgi{$_} for keys %psgi;
-
-    return HTTP::Response->from_psgi( $app->to_app->($env) );
-}

@@ -10,7 +10,7 @@ use Plack::App::GitHub::WebHook;
 my $payload = undef;
 my $app = Plack::App::GitHub::WebHook->new(
     hook   => sub { $payload = shift; },
-    access => [ allow => 'all' ]
+    access => 'all'
 );
 
 test_psgi $app, sub {

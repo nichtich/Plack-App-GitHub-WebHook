@@ -6,7 +6,7 @@ use HTTP::Message::PSGI;
 use Plack::App::GitHub::WebHook;
 
 my $app = Plack::App::GitHub::WebHook->new( 
-    access => [ allow => 'all' ],
+    access => 'all',
     hook   => sub {
         my ($payload, $event, $delivery, $logger) = @_;
         foreach my $level (qw(debug info warn error fatal)) {

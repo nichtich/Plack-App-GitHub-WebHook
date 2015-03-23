@@ -6,7 +6,7 @@ use HTTP::Message::PSGI;
 use Plack::App::GitHub::WebHook;
 
 my $app = Plack::App::GitHub::WebHook->new( 
-    access => [ allow => 'all' ],
+    access => 'all',
     safe => 1,
     hook => sub { die "WTF?!\n"; },
 )->to_app;

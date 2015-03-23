@@ -4,17 +4,25 @@ use warnings;
 use v5.10;
 
 use parent 'Plack::Component';
-use Plack::Util::Accessor qw(hook access app events safe secret);
+use Plack::Util::Accessor qw(hook events secret access safe);
 use Plack::Request;
-use Plack::Builder;
+use Plack::Middleware::HTTPExceptions;
 use Plack::Middleware::Access;
 use Carp qw(croak);
 use JSON qw(decode_json);
 
-our $VERSION = '0.7';
+our $VERSION = '0.8';
+
+our @GITHUB_IPS = (
+    allow => "204.232.175.64/27",
+    allow => "192.30.252.0/22",
+);
 
 sub to_app {
     my $self = shift;
+
+
+    # handle configuration
 
     if ( (ref $self->hook // '') ne 'ARRAY' ) {
         $self->hook( [ $self->hook // () ] );
@@ -26,17 +34,12 @@ sub to_app {
         }
     }
     
-    $self->access([
-        allow => "204.232.175.64/27",
-        allow => "192.30.252.0/22",
-        deny  => "all"
-    ]) unless $self->access;
 
-    my $app = builder {
-        enable 'Access', rules => $self->access;
-        enable 'HTTPExceptions';
+    # add middleware
+
+    my $app = Plack::Middleware::HTTPExceptions->wrap(
         sub { $self->call_granted($_[0]) }
-    };
+    );
 
     if ($self->secret) {
         require Plack::Middleware::HubSignature;
@@ -44,6 +47,21 @@ sub to_app {
             secret => $self->secret
         );
     }
+
+    $self->access('github') unless $self->access;
+    $self->access([]) if $self->access eq 'all';
+    my @rules = (@GITHUB_IPS, 'deny' => 'all');
+    if ( $self->access !~ /^github$/i ) {
+        @rules = ();
+        foreach (@{$self->access}) {
+            if (@rules and $rules[0] eq 'allow' and $_ =~ /^github$/i) {
+                push @rules, @GITHUB_IPS[1 .. $#GITHUB_IPS];
+            } else {
+                push @rules, $_;
+            }
+        }
+    }
+    $app = Plack::Middleware::Access->wrap( $app, rules => \@rules );
 
     $app;
 }
@@ -185,34 +203,6 @@ are called one by one until a task returns a false value.
         ]
     )->to_app;
 
-=head2 Access restriction    
-
-By default access is restricted to known GitHub WebHook IPs.
-
-    Plack::App::GitHub::WebHook->new(
-        hook => sub { ... },
-        access => [
-            allow => "204.232.175.64/27",
-            allow => "192.30.252.0/22",
-            deny  => 'all'
-        ]
-    )->to_app;
-
-    # this is equivalent to
-    use Plack::Builder;
-    builder {
-        mount 'notify' => builder {
-            enable 'Access', rules => [
-                allow => "204.232.175.64/27",
-                allow => "192.30.252.0/22",
-                deny  => 'all'
-            ]
-            Plack::App::GitHub::WebHook->new(
-                hook => sub { ... }
-            );
-        }
-    };
-
 =head2 Synchronize with a GitHub repository
 
 The following application automatically pulls the master branch of a GitHub
@@ -328,23 +318,52 @@ wrap the application in an eval block such as this:
         };
     };
 
+=item events
+
+A list of L<event types|http://developer.github.com/v3/activity/events/types/>
+expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
+
 =item secret
 
-Secret token set at github Webhook setting to validate payload.  See
+Secret token set at GitHub Webhook setting to validate payload.  See
 L<https://developer.github.com/webhooks/securing/> for details. Requires
 L<Plack::Middleware::HubSignature>.
 
 =item access
 
-Access restrictions, as passed to L<Plack::Middleware::Access>. See SYNOPSIS
-for the default value. A recent list of official GitHub WebHook IPs is vailable
-at L<https://api.github.com/meta>. One should only set the access value on
-instantiation, or manually call C<prepare_app> after modification.
+Access restrictions, as passed to L<Plack::Middleware::Access>. A recent list
+of official GitHub WebHook IPs is vailable at L<https://api.github.com/meta>.
+The default value
 
-=item events
+    access => 'github'
 
-A list of L<event types|http://developer.github.com/v3/activity/events/types/>
-expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
+is a shortcut for these official IP ranges
+
+    access => [
+        allow => "204.232.175.64/27",
+        allow => "192.30.252.0/22",
+        deny  => 'all'
+    ]
+
+and
+
+    access => [
+        allow => 'github',
+        ...
+    ]
+
+is a shortcut for
+
+    access => [
+        allow => "204.232.175.64/27",
+        allow => "192.30.252.0/22",
+        ...
+    ]
+
+To disable access control via IP ranges use any of
+
+    access => 'all'
+    access => []
 
 =cut
 

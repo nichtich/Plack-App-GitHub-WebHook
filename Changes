@@ -1,6 +1,8 @@
 # Change file for Plack::App::GitHub::WebHook
 
 {{$NEXT}}
+    - improve 'access' parameter
+    - add 'secret' parameter (issue #7)
 
 0.7  2015-03-20 16:52:15 CET
     - document logging 

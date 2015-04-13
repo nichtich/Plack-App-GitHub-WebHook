@@ -403,7 +403,7 @@ repository into a local working directory.
                     $cmd = ['git','clone',$origin,'-b',$branch,$work_tree];
                 }
                 $log->info(join ' ', '$', @$cmd);
-                run3 $cmd, undef, $log->{info}, $log->{error};
+                run3 $cmd, undef, $log->{debug}, $log->{warn};
                 1;
             },
             # sub { ...optional action after each pull... } 

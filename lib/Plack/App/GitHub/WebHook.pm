@@ -380,7 +380,7 @@ repository into a local working directory.
     use Plack::App::GitHub::WebHook;
     use IPC::Run3;
 
-    my $branch = "master;
+    my $branch = "master";
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(

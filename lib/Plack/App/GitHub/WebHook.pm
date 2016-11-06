@@ -430,6 +430,8 @@ repository into a local working directory.
         ],
     )->to_app;
 
+See L<GitHub::WebHook::Clone> for before copy and pasting this code.
+
 =head1 DEPLOYMENT
 
 Many deployment methods exist. An easy option might be to use Apache webserver
@@ -460,6 +462,10 @@ another user instead of C<www-data> by using Apache module SuExec.
 =item
 
 GitHub WebHooks are documented at L<http://developer.github.com/webhooks/>.
+
+=item
+
+See L<GitHub::WebHook> for a collection of handlers for typical tasks.
 
 =item
 

@@ -4,7 +4,7 @@ use warnings;
 use v5.10;
 
 use parent 'Plack::Component';
-use Plack::Util::Accessor qw(hook events secret access safe);
+use Plack::Util::Accessor qw(hook events secret access safe logger);
 use Plack::Request;
 use Plack::Middleware::HTTPExceptions;
 use Plack::Middleware::Access;
@@ -97,7 +97,7 @@ sub call_granted {
     }
     
     my $logger = Plack::App::GitHub::WebHook::Logger->new(
-        $env->{'psgix.logger'} || sub { }
+        $self->logger || $env->{'psgix.logger'} || sub { }
     );
 
     if ( $self->receive( [ $payload, $event, $delivery, $logger ], $env->{'psgi.errors'} ) ) {
@@ -136,6 +136,7 @@ sub receive {
 
 {
     package Plack::App::GitHub::WebHook::Logger;
+    use Scalar::Util qw(blessed);
     sub new {
         my $self = bless { logger => $_[1] }, $_[0];
         foreach my $level (qw(debug info warn error fatal)) {
@@ -146,7 +147,11 @@ sub receive {
     sub log {
         my ($self, $level, $message) = @_;
         chomp $message;
-        $self->{logger}->({ level => $level, message => $message });
+        if (blessed $self->{logger}) {
+            $self->{logger}->log( level => $level, message => $message );
+        } else {
+            $self->{logger}->({ level => $level, message => $message });
+        }
         1;
     }
     sub debug { $_[0]->log(debug => $_[1]) }
@@ -285,6 +290,20 @@ the payload.
 A list of L<event types|http://developer.github.com/v3/activity/events/types/>
 expected to be send with the C<X-GitHub-Event> header (e.g. C<['pull']>).
 
+=item logger
+
+Object or function reference to hande L<logging events|/LOGGING>.  An object
+must implement method C<log> that is called with named arguments:
+
+    $logger->log( level => $level, message => $message );
+
+For instance L<Log::Dispatch> can be used as logger this way.
+A function reference is called with hash reference arguments:
+
+    $logger->({ level => $level, message => $message });
+
+By default L<PSGI::Extensions|psgix.logger> is used as logger (if set).
+
 =item secret
 
 Secret token set at GitHub Webhook setting to validate payload.  See
@@ -349,8 +368,9 @@ wrap the application in an eval block such as this:
 
 =head1 LOGGING
 
-Each hook is passed a logging object as fourth parameter. It provides logging
-methods for each log level and a general log method:
+Each hook is passed a logger object to facilitate logging to
+L<PSGI::Extensions|psgix.logger>. The logger provides logging methods for each
+log level and a general log method:
 
     sub sample_hook {
         my ($payload, $event, $delivery, $log) = @_;

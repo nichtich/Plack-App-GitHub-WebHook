@@ -12,7 +12,7 @@ use Carp qw(croak);
 use JSON qw(decode_json);
 use Scalar::Util qw(blessed);
 
-our $VERSION = '0.8';
+our $VERSION = '0.9';
 
 our @GITHUB_IPS = (
     allow => "204.232.175.64/27",

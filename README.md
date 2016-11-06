@@ -108,6 +108,20 @@ This module requires at least Perl 5.10.
     A list of [event types](http://developer.github.com/v3/activity/events/types/)
     expected to be send with the `X-GitHub-Event` header (e.g. `['pull']`).
 
+- logger
+
+    Object or function reference to hande [logging events](#logging).  An object
+    must implement method `log` that is called with named arguments:
+
+        $logger->log( level => $level, message => $message );
+
+    For instance [Log::Dispatch](https://metacpan.org/pod/Log::Dispatch) can be used as logger this way.
+    A function reference is called with hash reference arguments:
+
+        $logger->({ level => $level, message => $message });
+
+    By default [PSGI::Extensions](https://metacpan.org/pod/psgix.logger) is used as logger (if set).
+
 - secret
 
     Secret token set at GitHub Webhook setting to validate payload.  See
@@ -169,8 +183,9 @@ This module requires at least Perl 5.10.
 
 # LOGGING
 
-Each hook is passed a logging object as fourth parameter. It provides logging
-methods for each log level and a general log method:
+Each hook is passed a logger object to facilitate logging to
+[PSGI::Extensions](https://metacpan.org/pod/psgix.logger). The logger provides logging methods for each
+log level and a general log method:
 
     sub sample_hook {
         my ($payload, $event, $delivery, $log) = @_;
@@ -200,7 +215,7 @@ repository into a local working directory.
     use Plack::App::GitHub::WebHook;
     use IPC::Run3;
 
-    my $branch = "master;
+    my $branch = "master";
     my $work_tree = "/some/path";
 
     Plack::App::GitHub::WebHook->new(
@@ -223,12 +238,14 @@ repository into a local working directory.
                     $cmd = ['git','clone',$origin,'-b',$branch,$work_tree];
                 }
                 $log->info(join ' ', '$', @$cmd);
-                run3 $cmd, undef, $log->{info}, $log->{error};
+                run3 $cmd, undef, $log->{debug}, $log->{warn};
                 1;
             },
             # sub { ...optional action after each pull... } 
         ],
     )->to_app;
+
+See [GitHub::WebHook::Clone](https://metacpan.org/pod/GitHub::WebHook::Clone) for before copy and pasting this code.
 
 # DEPLOYMENT
 
@@ -256,6 +273,7 @@ another user instead of `www-data` by using Apache module SuExec.
 # SEE ALSO
 
 - GitHub WebHooks are documented at [http://developer.github.com/webhooks/](http://developer.github.com/webhooks/).
+- See [GitHub::WebHook](https://metacpan.org/pod/GitHub::WebHook) for a collection of handlers for typical tasks.
 - [WWW::GitHub::PostReceiveHook](https://metacpan.org/pod/WWW::GitHub::PostReceiveHook) uses [Web::Simple](https://metacpan.org/pod/Web::Simple) to receive GitHub web
 hooks. A listener as exemplified by the module can also be created like this:
 
